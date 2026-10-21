@@ -1,0 +1,16 @@
+node_modules/
+dist/
+data/
+work/
+.env
+.env.*
+!.env.example
+*.log
+*.db
+*.db-shm
+*.db-wal
+auth.json
+.codex/
+coverage/
+test-results/
+playwright-report/
