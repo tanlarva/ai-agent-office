@@ -68,3 +68,24 @@ test('project session requests keep workspace and idempotency; history filter is
     assert.equal(new URL(calls[2].path, 'http://local').searchParams.get('path'), 'E:\\Projects\\space folder');
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test('debug feed pairs commands with results, merges streamed text and keeps user actions visible', async () => {
+  const { buildFeed } = await import('./debugFeed.ts');
+  const at = '2026-10-22T00:00:00Z';
+  const events = [
+    { sequence: 1, taskId: 't1', type: 'tool.started', payload: { kind: 'Bash', command: 'npm test' } },
+    { sequence: 2, taskId: 't1', type: 'agent.message_delta', payload: { text: 'Đang ' } },
+    { sequence: 3, taskId: 't1', type: 'agent.message_delta', payload: { text: 'viết' } },
+    { sequence: 4, taskId: 't1', type: 'tool.completed', payload: { kind: 'Bash', command: 'npm test', exitCode: 1, output: 'fail' } },
+    { sequence: 5, taskId: 't2', type: 'tool.started', payload: { kind: 'Bash', command: 'other' } },
+    { sequence: 6, taskId: 't1', type: 'user.note', payload: { mode: 'interrupt', text: 'Dừng' } },
+    { sequence: 7, taskId: null, type: 'run.completed', payload: { state: 'failed', message: 'Lỗi' } },
+  ].map(item => ({ schemaVersion: 1, eventId: String(item.sequence), runId: 'r', occurredAt: at, ...item }));
+  const feed = buildFeed(events, 't1');
+  assert.deepEqual(feed.map(entry => entry.kind), ['command', 'text', 'status', 'status']);
+  assert.deepEqual([feed[0].running, feed[0].exitCode, feed[0].output], [false, 1, 'fail']);
+  assert.equal(feed[1].text, 'Đang viết');
+  assert.match(feed[2].text, /chen ngang: Dừng/);
+  assert.equal(feed[3].tone, 'error');
+  assert.equal(buildFeed(events, 't1', 2).length, 2);
+});

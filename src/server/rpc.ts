@@ -17,9 +17,9 @@ export async function codexCommand(): Promise<{ file: string; args: string[] }> 
   }
   return { file: 'codex', args: [] };
 }
-export function providerEnvironment(): NodeJS.ProcessEnv {
+export function providerEnvironment(extra: readonly string[] = ['CODEX_HOME']): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
-  for (const key of ['PATH', 'Path', 'PATHEXT', 'SystemRoot', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP', 'APPDATA', 'LOCALAPPDATA', 'USERPROFILE', 'HOME', 'CODEX_HOME', 'PROGRAMFILES', 'ProgramFiles', 'PROCESSOR_ARCHITECTURE']) {
+  for (const key of ['PATH', 'Path', 'PATHEXT', 'SystemRoot', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP', 'APPDATA', 'LOCALAPPDATA', 'USERPROFILE', 'HOME', 'PROGRAMFILES', 'ProgramFiles', 'PROCESSOR_ARCHITECTURE', ...extra]) {
     if (process.env[key]) env[key] = process.env[key];
   }
   return env;
@@ -33,8 +33,10 @@ export class RpcClient {
   private closing: Promise<void> | undefined;
   onMessage: (message: RpcMessage) => void = () => {};
   readonly child: ChildProcessWithoutNullStreams;
-  constructor(file: string, args: string[], cwd: string) {
-    this.child = spawn(file, args, { cwd, env: providerEnvironment(), shell: false, windowsHide: true, stdio: 'pipe' });
+  private readonly label: string;
+  constructor(file: string, args: string[], cwd: string, options: { label?: string; env?: NodeJS.ProcessEnv } = {}) {
+    this.label = options.label ?? 'Codex';
+    this.child = spawn(file, args, { cwd, env: options.env ?? providerEnvironment(), shell: false, windowsHide: true, stdio: 'pipe' });
     this.exitPromise = new Promise(resolve => this.child.once('close', () => { this.fail(); resolve(); }));
     this.child.once('error', () => this.fail());
     this.child.stdin.on('error', () => this.fail());
@@ -58,7 +60,7 @@ export class RpcClient {
           const pending = this.pending.get(message.id);
           if (!pending) continue;
           clearTimeout(pending.timer); this.pending.delete(message.id);
-          if (message.error) pending.reject(new OfficeError('CODEX_RPC', 'Codex từ chối yêu cầu. Kiểm tra phiên bản, đăng nhập và quyền sandbox.', 503));
+          if (message.error) pending.reject(new OfficeError('CODEX_RPC', `${this.label} từ chối yêu cầu. Kiểm tra phiên bản, đăng nhập và quyền sandbox.`, 503));
           else pending.resolve(message.result);
         } else this.onMessage(message);
       }
@@ -66,18 +68,18 @@ export class RpcClient {
   }
   private fail(): void {
     this.dead = true;
-    for (const entry of this.pending.values()) { clearTimeout(entry.timer); entry.reject(new OfficeError('CODEX_OFFLINE', 'Mất kết nối với Codex App Server.', 503)); }
+    for (const entry of this.pending.values()) { clearTimeout(entry.timer); entry.reject(new OfficeError('CODEX_OFFLINE', `Mất kết nối với ${this.label}.`, 503)); }
     this.pending.clear();
     this.onMessage({ method: 'office/transportClosed' });
   }
   send(message: RpcMessage): void {
-    if (this.dead || this.child.stdin.destroyed) throw new OfficeError('CODEX_OFFLINE', 'Codex App Server đã đóng.', 503);
+    if (this.dead || this.child.stdin.destroyed) throw new OfficeError('CODEX_OFFLINE', `${this.label} đã đóng.`, 503);
     this.child.stdin.write(JSON.stringify(message) + '\n');
   }
   request(method: string, params: unknown, timeout = 30_000): Promise<unknown> {
     return new Promise((resolve, reject) => {
       const id = ++this.nextId;
-      const timer = setTimeout(() => { this.pending.delete(id); reject(new OfficeError('CODEX_TIMEOUT', 'Codex chưa phản hồi trong thời gian cho phép.', 503)); }, timeout);
+      const timer = setTimeout(() => { this.pending.delete(id); reject(new OfficeError('CODEX_TIMEOUT', `${this.label} chưa phản hồi trong thời gian cho phép.`, 503)); }, timeout);
       this.pending.set(id, { resolve, reject, timer });
       try { this.send({ id, method, params }); }
       catch (error) { clearTimeout(timer); this.pending.delete(id); reject(error); }

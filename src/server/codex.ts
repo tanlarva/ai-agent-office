@@ -1,5 +1,6 @@
-import { z } from 'zod';
-import type { ProviderStatus, Role, TurnResult } from '../shared/contracts.js';
+import type { AgentTodo, ProviderStatus, TurnResult } from '../shared/contracts.js';
+import type { Execution, Provider } from './provider.js';
+export { jsonSchema, type Execution, type Provider } from './provider.js';
 import { codexCommand, RpcClient } from './rpc.js';
 import { OfficeError, safeText } from './errors.js';
 import { providerTurnError } from './provider-errors.js';
@@ -7,17 +8,8 @@ import { parseLimitWindows } from './provider-limits.js';
 
 const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' ? value as Record<string, unknown> : {};
 const text = (value: unknown) => typeof value === 'string' ? value : '';
-export interface Execution {
-  cwd: string; role: Role; prompt: string; writable: boolean; model?: string;
-  schema: Record<string, unknown>; signal: AbortSignal;
-  onEvent: (type: string, payload: Record<string, unknown>) => Promise<void>;
-  onApproval: (method: string, description: string) => Promise<'accept' | 'decline'>;
-}
-export interface Provider {
-  status(): Promise<ProviderStatus>;
-  execute(options: Execution): Promise<TurnResult>;
-}
 export class CodexProvider implements Provider {
+  readonly id = 'codex' as const;
   constructor(private readonly cwd: string) {}
   private async connect(signal?: AbortSignal): Promise<RpcClient> {
     if (signal?.aborted) throw new OfficeError('CANCELED', 'Đã hủy công việc.', 409);
@@ -29,7 +21,7 @@ export class CodexProvider implements Provider {
     const abort = () => { void rpc.close(); };
     signal?.addEventListener('abort', abort, { once: true });
     try {
-      await rpc.request('initialize', { clientInfo: { name: 'ai_agent_office', title: 'AI Agent Office', version: '0.5.0' }, capabilities: { experimentalApi: false } });
+      await rpc.request('initialize', { clientInfo: { name: 'ai_agent_office', title: 'AI Agent Office', version: '0.6.0' }, capabilities: { experimentalApi: false } });
       rpc.send({ method: 'initialized', params: {} }); return rpc;
     } catch (error) { await rpc.close(); throw error; }
     finally { signal?.removeEventListener('abort', abort); }
@@ -41,7 +33,7 @@ export class CodexProvider implements Provider {
   }
   async status(): Promise<ProviderStatus> {
     let rpc: RpcClient | undefined;
-    const base: ProviderStatus = { id: 'codex', state: 'unavailable', billingMode: 'unknown', plan: null, message: 'Không kết nối được Codex. Chạy codex login rồi thử lại.', models: [], limits: null };
+    const base: ProviderStatus = { id: 'codex', state: 'unavailable', billingMode: 'unknown', plan: null, message: 'Không kết nối được Codex. Chạy codex login rồi thử lại.', models: [], limits: null, interaction: { questions: 'turn', steer: false } };
     try {
       rpc = await this.connect();
       const account = await this.account(rpc);
@@ -113,11 +105,17 @@ export class CodexProvider implements Provider {
         if (kind === 'agentMessage' && message.method === 'item/completed' && (!item.phase || item.phase === 'final_answer')) finalText = text(item.text);
         if (kind === 'commandExecution') {
           if (message.method === 'item/completed') tools.push({ command: text(item.command), exitCode: typeof item.exitCode === 'number' ? item.exitCode : null });
-          enqueue(() => options.onEvent(message.method === 'item/started' ? 'tool.started' : 'tool.completed', { kind, command: safeText(text(item.command), 2000), exitCode: typeof item.exitCode === 'number' ? item.exitCode : null }));
+          const output = message.method === 'item/completed' ? tail(text(item.aggregatedOutput)) : undefined;
+          enqueue(() => options.onEvent(message.method === 'item/started' ? 'tool.started' : 'tool.completed', { kind, command: safeText(text(item.command), 2000), exitCode: typeof item.exitCode === 'number' ? item.exitCode : null, ...(output ? { output } : {}) }));
         }
         if (kind === 'fileChange' && message.method === 'item/completed' && item.status === 'completed') {
-          changedFiles = true; enqueue(() => options.onEvent('artifact.created', { kind: 'file_changes', description: 'Codex đã áp dụng thay đổi trong workspace.' }));
+          changedFiles = true;
+          const paths = Array.isArray(item.changes) ? item.changes.map(change => text(record(change).path)).filter(Boolean).slice(0, 20) : [];
+          enqueue(() => options.onEvent('artifact.created', { kind: 'file_changes', description: 'Codex đã áp dụng thay đổi trong workspace.', paths }));
         }
+      } else if (message.method === 'turn/plan/updated' && Array.isArray(params.plan)) {
+        const todos = codexPlan(params.plan);
+        if (todos.length) enqueue(() => options.onEvent('agent.todos', { todos }));
       } else if (message.method === 'error') turnError = params.error;
       else if (message.method === 'turn/started') turnId = text(record(params.turn).id);
       else if (message.method === 'turn/completed') {
@@ -160,7 +158,11 @@ export class CodexProvider implements Provider {
   }
 }
 
-export function jsonSchema(schema: z.ZodType): Record<string, unknown> {
-  const result = z.toJSONSchema(schema) as Record<string, unknown>;
-  delete result.$schema; return result;
+const tail = (value: string, max = 1500) => value ? safeText(value.length > max ? '…' + value.slice(-max) : value, max + 1) : '';
+export function codexPlan(plan: unknown[]): AgentTodo[] {
+  // App Server plan steps: { step, status: pending | inProgress | completed }.
+  return plan.map(record).filter(item => typeof item.step === 'string').slice(0, 20).map(item => ({
+    text: safeText(text(item.step), 300),
+    status: item.status === 'completed' ? 'completed' : item.status === 'inProgress' || item.status === 'in_progress' ? 'in_progress' : 'pending',
+  }));
 }

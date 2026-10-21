@@ -1,17 +1,22 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowUpRight, FolderOpen, LockKeyhole, X } from 'lucide-react';
-import type { ProjectSession, ProviderStatus, Run } from '../shared/contracts';
+import { providerNames, type ProjectSession, type ProviderId, type ProviderStatus, type Run } from '../shared/contracts';
 import { api, errorMessage } from './api';
 import { FolderPicker } from './FolderPicker';
 import { getWorkflow, workflows, type WorkflowId } from '../shared/workflows';
+import { suggestWorkflow } from '../shared/suggest';
 
-export function NewRunDialog({ provider, initialSessionId, onClose, onCreated }: { provider: ProviderStatus | undefined; initialSessionId?: string; onClose: () => void; onCreated: (run: Run) => void }) {
+export interface RunDraft { goal: string; provider?: ProviderId; workflowId?: WorkflowId; writable?: boolean }
+export function NewRunDialog({ providers, initialSessionId, draft, onClose, onCreated }: { providers: ProviderStatus[]; initialSessionId?: string; draft?: RunDraft; onClose: () => void; onCreated: (run: Run) => void }) {
+  const initialGoal = draft?.goal ?? '';
   const dialog = useRef<HTMLDialogElement>(null);
-  const [goal, setGoal] = useState('');
+  const [goal, setGoal] = useState(initialGoal);
+  const [providerId, setProviderId] = useState<ProviderId>(() => { if (draft?.provider) return draft.provider; try { return (JSON.parse(localStorage.getItem('office.quick') ?? '{}') as { provider?: ProviderId }).provider ?? 'codex'; } catch { return 'codex'; } });
+  const provider = providers.find(item => item.id === providerId);
   const [workspace, setWorkspace] = useState('');
   const [model, setModel] = useState('');
-  const [workflowId, setWorkflowId] = useState<WorkflowId>('software');
-  const [writable, setWritable] = useState(false);
+  const [workflowId, setWorkflowId] = useState<WorkflowId>(() => draft?.workflowId ?? (initialGoal ? suggestWorkflow(initialGoal) : 'software'));
+  const [writable, setWritable] = useState(draft?.writable ?? false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessions, setSessions] = useState<ProjectSession[]>([]);
@@ -80,7 +85,7 @@ export function NewRunDialog({ provider, initialSessionId, onClose, onCreated }:
         targetSessionId = created.id;
         targetWorkspace = created.workspace;
       }
-      const result = await api.create({ goal: goal.trim(), workspace: targetWorkspace, sessionId: targetSessionId, workflowId, mode: writable ? 'workspace-write' : 'read-only', ...(model ? { model } : {}) }, requestKey.current);
+      const result = await api.create({ goal: goal.trim(), workspace: targetWorkspace, sessionId: targetSessionId, workflowId, mode: writable ? 'workspace-write' : 'read-only', provider: providerId, ...(model ? { model } : {}) }, requestKey.current);
       onCreated(result.data);
     } catch (failure) { setError(errorMessage(failure)); setBusy(false); }
   }
@@ -109,7 +114,7 @@ export function NewRunDialog({ provider, initialSessionId, onClose, onCreated }:
       <p className="workflow-path">{getWorkflow(workflowId).steps.map(step => step.name).join(' → ')}</p>
       <details className="workflow-team"><summary>Xem phân công và quyền của {getWorkflow(workflowId).steps.length} vai trò</summary><ol className="workflow-preview" aria-label="Vai trò trong quy trình">{getWorkflow(workflowId).steps.map(step => <li key={step.role}><strong>{step.name}</strong><span>{step.specialty}</span><small>{step.writable ? 'Có thể ghi khi bạn cho phép' : 'Chỉ đọc'}</small></li>)}</ol></details>
       {workflowId === 'audit' && <p className="field-help">Trong mục tiêu, ghi loại kiểm toán, kỳ/phạm vi, tiêu chí áp dụng và hồ sơ đã cung cấp. Đầu ra là báo cáo hỗ trợ với phát hiện, dẫn chứng và kiến nghị.</p>}
-      <p className="field-help">Mỗi vai trò dùng một lượt Codex riêng. Quy trình nhiều bước có thể dùng nhiều token hơn. Các mẫu hiện dùng tài liệu local, chưa có tìm kiếm web hay đăng bài tự động.</p>
+      <p className="field-help">Mỗi vai trò dùng một lượt model riêng. Quy trình nhiều bước có thể dùng nhiều token hơn. Các mẫu hiện dùng tài liệu local, chưa có tìm kiếm web hay đăng bài tự động.</p>
       <label htmlFor="goal">Bạn muốn hoàn thành điều gì?</label>
       <textarea id="goal" required minLength={5} maxLength={6000} rows={5} placeholder="Mô tả mục tiêu, tiêu chí hoàn thành và các giới hạn cần tuân thủ…" value={goal} onChange={event => { setGoal(event.target.value); changed(); }} disabled={busy} />
       <label htmlFor="workspace"><FolderOpen size={15} /> Thư mục làm việc trên máy</label>
@@ -118,14 +123,17 @@ export function NewRunDialog({ provider, initialSessionId, onClose, onCreated }:
       {showFolders && !sessionId && <FolderPicker selected={workspace} onSelect={chooseWorkspace} onClose={() => setShowFolders(false)} />}
       {!sessionId && <button type="button" className="button secondary save-session-button" disabled={busy || !sessionName.trim() || workspace.trim().length < 3} onClick={() => void saveSessionOnly()}>Lưu phiên, chưa chạy AI</button>}
       {sessionSaved && <p className="field-help" role="status">Phiên đã lưu trên máy. Chỉ gọi AI khi bạn bấm Bắt đầu công việc.</p>}
-      <label htmlFor="model">Model Codex</label>
+      <label htmlFor="provider">Nhân viên AI (provider)</label>
+      <div className="segmented provider-choice" role="radiogroup" aria-label="Provider" id="provider">{(['codex', 'claude'] as const).map(id => { const item = providers.find(entry => entry.id === id); return <button type="button" role="radio" key={id} aria-checked={providerId === id} disabled={busy || !item} onClick={() => { setProviderId(id); setModel(''); changed(); }}><span className={`status-dot ${item?.state === 'ready' ? 'ready' : 'unready'}`} />{providerNames[id]}{item?.plan ? ` · ${item.plan}` : ''}</button>; })}</div>
+      <p className="field-help">{providerId === 'claude' ? 'Claude Code: agent hỏi lại bạn ngay giữa chừng và nhận chỉ dẫn trực tiếp khi đang làm.' : 'Codex: câu hỏi được gửi khi agent kết thúc lượt; chen ngang sẽ dừng và làm lại bước.'}</p>
+      <label htmlFor="model">Model {providerNames[providerId]}</label>
       <select id="model" value={model} onChange={event => { setModel(event.target.value); changed(); }} disabled={busy}>
-        <option value="">Mặc định theo cấu hình Codex</option>
+        <option value="">Mặc định theo cấu hình {providerNames[providerId]}</option>
         {provider?.models.map(item => <option key={item.id} value={item.id}>{item.name}{item.isDefault ? ' · mặc định' : ''}</option>)}
       </select>
       <label className="permission-option"><input type="checkbox" checked={writable} onChange={event => { setWritable(event.target.checked); changed(); }} disabled={busy} /><span><strong>Cho phép sửa file trong thư mục này</strong><small>{writable ? 'Chỉ vai trò thực hiện được sửa file; QA và người review chỉ đọc.' : 'Mặc định chỉ đọc: phân tích và đề xuất, không sửa file.'}</small></span></label>
-      <p className="field-help privacy-note"><LockKeyhole size={14} /> Dùng phiên Codex trên máy. Không tự chuyển sang thanh toán API.</p>
-      {provider?.state !== 'ready' && <p className="form-error" role="status">{provider?.message ?? 'Chưa xác minh kết nối Codex. Đóng cửa sổ và làm mới kết nối trước.'}</p>}
+      <p className="field-help privacy-note"><LockKeyhole size={14} /> Dùng phiên đăng nhập {providerNames[providerId]} trên máy (thuê bao). Không tự chuyển sang thanh toán API.</p>
+      {provider?.state !== 'ready' && <p className="form-error" role="status">{provider?.message ?? 'Chưa xác minh kết nối provider. Đóng cửa sổ và làm mới kết nối trước.'}</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
       <div className="dialog-actions"><button type="button" className="button secondary" onClick={onClose} disabled={busy}>Để sau</button><button className="button primary" type="submit" disabled={busy || sessionsLoading || provider?.state !== 'ready'}>{busy ? 'Đang giao việc…' : 'Bắt đầu công việc'}<ArrowUpRight size={17} /></button></div>
     </form>

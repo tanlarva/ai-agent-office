@@ -2,7 +2,7 @@ import type { Role, Run, State } from '../shared/contracts';
 import { getWorkflow } from '../shared/workflows';
 
 export const stateLabels: Record<State, string> = {
-  queued: 'Đang chờ', running: 'Đang làm việc', waiting_approval: 'Chờ phê duyệt',
+  queued: 'Đang chờ', running: 'Đang làm việc', waiting_approval: 'Chờ phê duyệt', waiting_input: 'Chờ bạn trả lời',
   waiting_capacity: 'Chờ điều tiết',
   succeeded: 'Hoàn thành', failed: 'Có lỗi', canceling: 'Đang dừng', canceled: 'Đã hủy', interrupted: 'Bị gián đoạn',
 };

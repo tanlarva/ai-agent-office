@@ -23,9 +23,9 @@ Xem [SESSION-WORKSPACE-02](handoffs/SESSION-WORKSPACE-02.md) để biết file v
 | I-01 | UI -> runtime -> provider -> review thật | done cho read-only | Bằng chứng trong IMPLEMENTATION-01 |
 | Q-01 | Review độc lập, test lỗi và browser QA | done cho phạm vi đã kiểm | 26 tests + handoff reviewer |
 | P-01-W | Live write/test/cancel/approval trên Windows | blocked hiện tại | Provider 429; thử lại khi hạn chế được gỡ |
-| T-02 | Chế độ một agent cho task nhỏ | planned | Chưa triển khai |
+| T-02 | Chế độ một agent cho task nhỏ | done | Mẫu solo, CLAUDE-INTERACT-07 |
 | R-02 | DAG tùy biến, nhiều attempts và worktree manager | planned | Isolation trước parallel writer |
-| P-02 | Adapter Claude | planned | Sau Codex và khi người dùng yêu cầu |
+| P-02 | Adapter Claude | done (fake CLI) / live chưa chạy | src/server/claude.ts; ADR-0002 |
 | M-01 | Benchmark single-agent và nhiều agent | planned | Chưa có bằng chứng tiết kiệm |
 
 R-01 hiện chạy các template 3–5 vai trò tuần tự, không phải generic DAG scheduler.
@@ -61,3 +61,14 @@ Chi tiết file, giới hạn, backup và cách thử: [BALANCE-05](handoffs/BAL
 Tám không gian theo workflow, robot gõ phím/chờ/đi bàn giao, điều khiển chuyển động, tham quan DEMO không gọi AI.
 76 test provider giả; check/lint/build; browser kiểm tra các phòng và handoff. Không thay database/API/quyền.
 Xem [OFFICE-LIFE-06](handoffs/OFFICE-LIFE-06.md).
+
+## CLAUDE-INTERACT-07 — done (live Claude chưa chạy)
+
+Theo yêu cầu 21/10/2026: tích hợp Claude, agent hỏi lại + hộp thư/thông báo, chen ngang, màn hình debug, 3D sinh động hơn, giao việc nhanh.
+104 test provider giả (gồm CLI Claude giả nói stream-json); check/lint/build; kiểm tra trình duyệt với backend thật + provider giả.
+Handshake thật với Claude Code 2.1.222 đọc được catalog; chưa có lượt model live. Xem [CLAUDE-INTERACT-07](handoffs/CLAUDE-INTERACT-07.md).
+
+| ID | Đầu ra | Trạng thái | Ghi chú |
+| --- | --- | --- | --- |
+| P-02-L | Live Claude: đọc, ghi, hỏi, steer, cancel trên workspace mẫu | planned | Cần claude auth login trên máy người dùng |
+| P-01-S | Codex: hỏi giữa lượt / turn steer qua App Server | planned | Xác minh tài liệu App Server trước |

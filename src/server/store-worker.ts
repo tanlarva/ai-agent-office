@@ -21,12 +21,12 @@ try {
 
 function execute(op: string, args: Record<string, unknown>): unknown {
   if (op === 'scheduling_get') {
-    const row = db.prepare("SELECT next_allowed_at,rate_limit_streak FROM provider_cooldowns WHERE provider='codex'").get();
+    const row = db.prepare('SELECT next_allowed_at,rate_limit_streak FROM provider_cooldowns WHERE provider=?').get(String(args.provider ?? 'codex'));
     return row ? { nextAllowedAt: row.next_allowed_at, rateLimitStreak: row.rate_limit_streak } : null;
   }
   if (op === 'scheduling_save') {
     const value = args.value as { nextAllowedAt: number; rateLimitStreak: number };
-    db.prepare("INSERT INTO provider_cooldowns(provider,next_allowed_at,rate_limit_streak) VALUES('codex',?,?) ON CONFLICT(provider) DO UPDATE SET next_allowed_at=excluded.next_allowed_at,rate_limit_streak=excluded.rate_limit_streak").run(value.nextAllowedAt, value.rateLimitStreak);
+    db.prepare('INSERT INTO provider_cooldowns(provider,next_allowed_at,rate_limit_streak) VALUES(?,?,?) ON CONFLICT(provider) DO UPDATE SET next_allowed_at=excluded.next_allowed_at,rate_limit_streak=excluded.rate_limit_streak').run(String(args.provider ?? 'codex'), value.nextAllowedAt, value.rateLimitStreak);
     return null;
   }
   if (op === 'create') {

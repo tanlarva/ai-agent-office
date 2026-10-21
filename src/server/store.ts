@@ -1,7 +1,7 @@
 import { Worker } from 'node:worker_threads';
 import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import type { OfficeEvent, Run, ProjectSession, SchedulingState } from '../shared/contracts.js';
+import type { OfficeEvent, Run, ProjectSession, ProviderId, SchedulingState } from '../shared/contracts.js';
 
 export class Store {
   private worker: Worker;
@@ -52,7 +52,7 @@ export class Store {
   sessions(limit: number, cursor?: string): Promise<ProjectSession[]> { return this.call('session_list', { limit, cursor }); }
   events(id: string, after: number, limit: number): Promise<OfficeEvent[]> { return this.call('events', { id, after, limit }); }
   active(): Promise<Run[]> { return this.call('active', {}); }
-  scheduling(): Promise<SchedulingState | null> { return this.call('scheduling_get', {}); }
-  saveScheduling(value: SchedulingState): Promise<null> { return this.call('scheduling_save', { value }); }
+  scheduling(provider: ProviderId = 'codex'): Promise<SchedulingState | null> { return this.call('scheduling_get', { provider }); }
+  saveScheduling(value: SchedulingState, provider: ProviderId = 'codex'): Promise<null> { return this.call('scheduling_save', { value, provider }); }
   async close(): Promise<void> { await this.worker.terminate(); }
 }

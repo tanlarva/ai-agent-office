@@ -1,4 +1,4 @@
-import type { CreateRun, CreateProjectSession, ProjectSession, FolderPage, Envelope, OfficeEvent, Page, ProviderStatus, Run, SchedulingStatus } from '../shared/contracts';
+import type { AttentionItem, CreateRun, CreateProjectSession, ProjectSession, FolderPage, Envelope, OfficeEvent, Page, ProviderId, ProviderStatus, Run, SchedulingStatus, UserNote } from '../shared/contracts';
 
 let csrfToken: string | null = null;
 
@@ -27,7 +27,10 @@ export const api = {
     csrfToken = result.data.csrfToken;
   },
   providers: (signal?: AbortSignal) => request<Envelope<ProviderStatus[]>>('/api/providers', { signal }),
-  scheduling: (signal?: AbortSignal) => request<Envelope<SchedulingStatus>>('/api/scheduling', { signal }),
+  scheduling: (signal?: AbortSignal, provider: ProviderId = 'codex') => request<Envelope<SchedulingStatus>>(`/api/scheduling?provider=${provider}`, { signal }),
+  attention: (signal?: AbortSignal) => request<Envelope<AttentionItem[]>>('/api/attention', { signal }),
+  answer: (id: string, body: { answers: string[]; response?: string; skip?: boolean }) => request<Envelope<Run>>(`/api/inquiries/${encodeURIComponent(id)}/answers`, { method: 'POST', body: JSON.stringify(body) }),
+  note: (runId: string, text: string, mode: UserNote['mode']) => request<Envelope<Run>>(`/api/runs/${encodeURIComponent(runId)}/notes`, { method: 'POST', body: JSON.stringify({ text, mode }) }),
   runs: (signal?: AbortSignal, sessionId?: string) => request<Page<Run>>(`/api/runs?limit=30${sessionId ? `&sessionId=${encodeURIComponent(sessionId)}` : ''}`, { signal }),
   projectSessions: (signal?: AbortSignal, cursor?: string) => request<Page<ProjectSession>>(`/api/project-sessions?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, { signal }),
   createProjectSession: (input: CreateProjectSession, key: string) => request<Envelope<ProjectSession>>('/api/project-sessions', { method: 'POST', body: JSON.stringify(input), headers: { 'Idempotency-Key': key } }),
@@ -44,8 +47,8 @@ export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Không thể hoàn tất yêu cầu.';
 }
 
-export function mergeEvents(current: OfficeEvent[], incoming: OfficeEvent[]): OfficeEvent[] {
+export function mergeEvents(current: OfficeEvent[], incoming: OfficeEvent[], limit = 200): OfficeEvent[] {
   const items = new Map(current.map(event => [event.sequence, event]));
   for (const event of incoming) items.set(event.sequence, event);
-  return [...items.values()].sort((a, b) => a.sequence - b.sequence).slice(-200);
+  return [...items.values()].sort((a, b) => a.sequence - b.sequence).slice(-limit);
 }

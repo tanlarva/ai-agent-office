@@ -7,7 +7,7 @@ Ngày 20/10/2026, người dùng xác nhận: “Chọn A, chạy local Windows,
 | D-01 | accepted | Local Windows, UI trình duyệt, backend loopback | Người dùng xác nhận |
 | D-02 | accepted | React + TS + Vite; Node.js + Fastify; SQLite; React Three Fiber | Người dùng chọn A |
 | D-03 | accepted | Luồng thật cùng 3D đơn giản | Người dùng xác nhận |
-| D-04 | accepted | Codex trước; Claude sau | Người dùng xác nhận |
+| D-04 | accepted, mở rộng bởi D-11 | Codex trước; Claude sau | Người dùng xác nhận; Claude thêm ngày 22/10/2026 |
 | D-05 | baseline kỹ thuật | Chỉ đọc mặc định; quyền ghi opt-in từng run, approval của thao tác cụ thể | Áp dụng least privilege, không suy ra quyền rộng từ việc chọn stack |
 
 Chi tiết: [ADR-0001](decisions/ADR-0001-local-typescript-codex.md).
@@ -71,3 +71,22 @@ Accepted ngày 20/10/2026 theo yêu cầu làm nhân vật di chuyển khi hoàn
 Hoạt ảnh React Three Fiber dùng ref/useFrame và demand rendering, không cập nhật React mỗi frame.
 Chỉ chuyển trạng thái live/chờ sang succeeded vừa quan sát được mới phát hành trình; lịch sử có sẵn và run khác không phát replay.
 Không kéo dài nhiệm vụ AI để chờ nhân vật đi xong. Tham quan cục bộ có nhãn DEMO và không dùng backend/model.
+
+## D-11 — Claude Code là provider thứ hai
+
+Accepted ngày 22/10/2026 theo yêu cầu ngày 21/10/2026 “tích hợp bạn vào đây”. Thay phần “Claude sau” của D-04.
+Adapter dùng Claude Code CLI đã cài ở chế độ headless stream-json, không thêm dependency, chỉ chấp nhận thuê bao Claude.ai.
+Mỗi run chọn Codex hoặc Claude; điều tiết lưu riêng theo provider. Chi tiết: [ADR-0002](decisions/ADR-0002-claude-provider-and-interaction.md).
+
+## D-12 — Agent hỏi lại, chen ngang, thông báo và màn hình debug
+
+Accepted ngày 22/10/2026 theo cùng yêu cầu. Trạng thái mới `waiting_input`; câu hỏi giữa lượt (Claude) và cuối lượt (mọi provider, tối đa 2 vòng).
+Chỉ dẫn `steer`/`queued`/`interrupt` (tối đa 5 lần chen ngang mỗi bước). Thời gian chờ người không tính vào 20 phút, tối đa 2 giờ.
+Màn hình nhân viên dựng từ sự kiện runtime đã lưu (lệnh, exit code, output rút gọn, checklist agent); không có dữ liệu mô phỏng.
+
+## D-13 — Văn phòng 3D sinh động hơn, giao việc nhanh, quy trình một agent
+
+Accepted ngày 22/10/2026. Vẫn procedural, không asset ngoài (giữ D-10): geometry/material dùng chung, robot có damping, chớp mắt,
+giơ tay khi hỏi, ăn mừng khi bàn giao, bảng tên và màn hình bàn hiển thị lệnh thật; camera xoay/phóng; giảm DPR khi GPU chậm.
+Ô “Giao việc nhanh” nhớ dự án/provider/quyền và gợi ý quy trình bằng từ khoá cục bộ (không gọi model).
+Thêm mẫu `solo` (Một agent) cho việc nhỏ — triển khai T-02.

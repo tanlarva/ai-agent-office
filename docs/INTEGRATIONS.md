@@ -25,6 +25,8 @@ Nguồn: [Pro/Max và Claude Code](https://support.claude.com/en/articles/111458
 [Agent SDK và thuê bao](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan),
 [Agent SDK overview](https://code.claude.com/docs/en/agent-sdk/overview).
 
+Trạng thái 22/10/2026: adapter Claude đã triển khai qua Claude Code CLI headless (ADR-0002). Handshake initialize đã chạy với CLI 2.1.222; lượt model live chưa chạy.
+
 ## Quy tắc xác thực
 
 - Dùng flow chính thức qua CLI/App Server/SDK phù hợp; ưu tiên để công cụ provider tự quản lý credential.

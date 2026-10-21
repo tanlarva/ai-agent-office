@@ -6,7 +6,7 @@ Không nhận prompt hệ thống, quyền hoặc danh sách role tùy ý từ b
 
 ## Các mẫu có sẵn
 
-Mỗi mẫu bắt đầu bằng Orchestrator xác định phạm vi, giả định và tiêu chí chấp nhận.
+Mỗi mẫu nhiều vai trò bắt đầu bằng Orchestrator xác định phạm vi, giả định và tiêu chí chấp nhận. Riêng “Một agent” chỉ có một bước để tiết kiệm lượt model.
 
 | Mẫu | Các vai trò sau Orchestrator | Đầu ra cần kiểm tra |
 | --- | --- | --- |
@@ -18,6 +18,7 @@ Mỗi mẫu bắt đầu bằng Orchestrator xác định phạm vi, giả đị
 | Biên soạn nội dung | Content Researcher → Writer → Editor | Tư liệu/dàn ý, bản thảo, biên tập và kiểm chứng |
 | Kiểm toán | Chuyên viên rủi ro → Kiểm tra bằng chứng → Lập báo cáo kiểm toán → Soát xét độc lập | Ma trận rủi ro, đối chiếu, hồ sơ phát hiện và báo cáo có dẫn chứng |
 | Tổng quát | Builder → Reviewer | Quy trình ba vai trò tương thích phiên cũ |
+| Một agent (v0.6) | (không có Orchestrator) Nhân viên tổng hợp | Việc nhỏ: tự làm và tự kiểm chứng; ghi rủi ro còn lại vì không có reviewer riêng |
 
 ## Phiên và lịch sử
 

@@ -1,6 +1,6 @@
 # AI Agent Office
 
-Ứng dụng cá nhân trên Windows: giao việc qua trình duyệt, xem Codex làm việc trong văn phòng 3D và theo dõi bằng chứng từ runtime.
+Ứng dụng cá nhân trên Windows: giao việc qua trình duyệt, xem Codex hoặc Claude làm việc trong văn phòng 3D, trả lời khi agent hỏi, chen ngang khi agent đi sai hướng và theo dõi bằng chứng từ runtime.
 
 ## Baseline đã chọn
 
@@ -11,9 +11,10 @@ Các đề xuất cũ trong FRAMEWORKS/ARCHITECTURE là hướng so sánh hoặc
 ## Yêu cầu
 
 - Windows, Node.js 24.x, npm.
-- Codex CLI đã cài; chạy `codex login` để đăng nhập bằng ChatGPT.
+- Codex CLI đã cài; chạy `codex login` để đăng nhập bằng ChatGPT (tuỳ chọn nếu chỉ dùng Claude).
+- Claude Code CLI đã cài; chạy `claude auth login` để đăng nhập bằng tài khoản Claude Pro/Max (tuỳ chọn nếu chỉ dùng Codex).
 - Một thư mục workspace riêng do bạn chọn; không dùng source Agent Office làm workspace.
-- Ứng dụng chỉ dùng mode đăng nhập ChatGPT; không tự dùng API key hoặc mua credit.
+- Ứng dụng chỉ dùng đăng nhập thuê bao (ChatGPT / Claude.ai); không tự dùng API key hoặc mua credit. Có ANTHROPIC_API_KEY trong Claude Code thì provider Claude bị chặn.
 
 ## Chạy
 
@@ -28,7 +29,7 @@ npm start
 ```
 
 Mở **http://127.0.0.1:4310**. Ctrl+C để dừng.
-`doctor` kiểm tra App Server, billing mode, model catalog và hạn mức nếu có; không gửi prompt model.
+`doctor` kiểm tra Codex App Server và Claude Code (handshake initialize): billing mode, model catalog và hạn mức nếu có; không gửi prompt model.
 
 Phát triển: `npm run dev`, mở http://127.0.0.1:5173.
 Dev gồm TypeScript watch, backend và Vite; schema/backend được compile trước khi start.
@@ -99,6 +100,37 @@ Nút **Dừng chuyển động** chỉ dừng hình ảnh, không huỷ công vi
 Bảng 2D, task summary và log vẫn là nơi kiểm tra kết quả thật.
 Xem [bàn giao v0.5](docs/handoffs/OFFICE-LIFE-06.md).
 
+## Claude, hỏi lại, chen ngang và màn hình nhân viên (v0.6)
+
+**Giao việc nhanh**: gõ mục tiêu ở ô trên cùng (phím / để focus, Ctrl+Enter để giao). Ô này nhớ dự án, provider và quyền lần trước,
+gợi ý quy trình bằng từ khoá ngay trên máy (không gọi model). Lần đầu chưa có phiên, ô mở hộp thoại đầy đủ để chọn thư mục.
+Có mẫu nhanh (Sửa lỗi, Thêm tính năng, Review code…) và quy trình **Một agent** cho việc nhỏ, ít lượt model nhất.
+
+**Chọn nhân viên AI**: mỗi công việc chạy bằng Codex hoặc Claude. Claude dùng Claude Code CLI ở chế độ headless,
+không nạp hooks/settings/MCP của dự án; vai trò chỉ đọc không có công cụ sửa file; lệnh shell cần quyền được hỏi bạn ở bước ghi
+hoặc bước QA của run ghi, các bước khác bị từ chối. Điều tiết 429/hạn mức lưu riêng cho từng provider.
+
+**Agent hỏi lại bạn**: khi thiếu thông tin quyết định, agent hỏi (Claude hỏi ngay giữa chừng và tạm dừng; mọi provider có thể hỏi
+cuối lượt rồi làm lại vai trò với câu trả lời, tối đa 2 vòng). Câu hỏi hiện ở hộp thư **CẦN BẠN TRẢ LỜI**, chuông trên thanh trên,
+toast có âm báo, số đếm trên tiêu đề tab và — nếu bấm **Bật thông báo** — thông báo Windows khi bạn ở tab khác.
+Chọn đáp án, gõ câu trả lời riêng, hoặc **Để agent tự quyết** (agent ghi rõ giả định). Thời gian chờ không tính vào 20 phút; tối đa 2 giờ.
+
+**Chen ngang**: trong khung Chen ngang của công việc đang chạy:
+- **Gửi ngay** (Claude): chỉ dẫn vào thẳng lượt đang chạy, agent đọc ở bước kế tiếp mà không dừng. Với Codex: gửi cho lượt sau.
+- **Dừng & làm lại**: dừng lượt hiện tại và làm lại bước đó theo chỉ dẫn (tối đa 5 lần/bước). Workspace có thể còn thay đổi dở dang; agent được nhắc kiểm tra.
+Chỉ dẫn là lời của bạn nhưng không mở rộng quyền; sandbox/quyền ghi vẫn như lúc giao việc.
+
+**Màn hình nhân viên**: bấm robot trong 3D, nút *Xem màn hình* hoặc bước trong quy trình. Màn hình hiển thị lệnh đang chạy,
+exit code, output rút gọn, file đã sửa, đoạn agent đang soạn, checklist agent tự báo (Claude TodoWrite / Codex plan) và các lần bạn trả lời/chen ngang.
+Chế độ *Theo dõi tự động* luôn chuyển sang vai trò đang làm; *Phóng to* để xem toàn màn hình. Tất cả từ sự kiện runtime đã lưu.
+
+**Văn phòng 3D**: kéo để xoay, cuộn để phóng, nhấp đúp để về góc mặc định. Robot gõ phím khi làm, giơ tay và hiện dấu ? khi hỏi bạn,
+gõ chân khi chờ phê duyệt, xem đồng hồ khi chờ điều tiết, ăn mừng khi bàn giao, cúi đầu khi lỗi; bảng tên ghi việc đang làm;
+màn hình trên bàn hiện các lệnh thật gần nhất. Geometry/material dùng chung, render theo nhu cầu (20 fps khi rảnh, đầy đủ khi có chuyển động),
+tự giảm độ phân giải khi GPU chậm, tôn trọng chế độ giảm chuyển động.
+
+Xem [ADR-0002](docs/decisions/ADR-0002-claude-provider-and-interaction.md) và [bàn giao v0.6](docs/handoffs/CLAUDE-INTERACT-07.md).
+
 ## Kiểm soát phạm vi
 
 Backend bind loopback, kiểm tra Host/Origin, cookie HttpOnly + SameSite và CSRF cho mutation.
@@ -114,6 +146,8 @@ Prompt chỉ là hướng dẫn tác vụ, không thay thế quyền hệ điề
 ## Cấu hình tùy chọn
 
 - `OFFICE_CODEX_PATH`: đường dẫn tuyệt đối tới codex.exe hoặc codex.js, khi app không tìm thấy CLI.
+- `OFFICE_CLAUDE_PATH`: đường dẫn tuyệt đối tới claude.exe hoặc cli .js, khi app không tìm thấy Claude Code (mặc định tìm trong %APPDATA%
+pm và %USERPROFILE%.localin).
 - `OFFICE_WORKSPACE_ROOT`: giới hạn workspace phải nằm trong một root cụ thể.
 - `OFFICE_CALL_GAP_MS`: giãn lượt từ 1000..120000 ms, mặc định 15000.
 - `OFFICE_RATE_RETRIES`: 0..2 lần thử thêm cho 429 ở bước chỉ đọc, mặc định 2.
@@ -153,7 +187,7 @@ Cặp phiên bản package đã khóa trong package-lock.json; TypeScript 6 đư
 
 ## Giới hạn hiện tại
 
-Chưa tích hợp Claude; chưa có auto-repair, worktree manager, parallel runtime agents, multi-user hoặc cloud.
+Claude chưa được chạy live trong phiên phát triển v0.6 (máy phát triển chưa đăng nhập); chạy `npm run doctor` rồi thử một việc chỉ đọc nhỏ trước. Chưa có auto-repair, worktree manager, parallel runtime agents, multi-user hoặc cloud.
 Các task ghi thao tác tuần tự trực tiếp trên workspace bạn chọn, không tạo commit tự động.
 MVP chưa triển khai artifact download riêng, pause/resume provider hoặc tuỳ biến task graph.
 Ba đến năm lượt model cho một việc nhỏ có thể tốn hơn một agent; chưa có benchmark chứng minh giảm token.

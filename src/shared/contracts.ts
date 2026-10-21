@@ -2,9 +2,12 @@ import { z } from 'zod';
 import { workflowIdSchema, type WorkflowDefinition, type WorkflowId, type Role } from './workflows.js';
 export { roleSchema, type Role } from './workflows.js';
 
-export const stateSchema = z.enum(['queued', 'running', 'waiting_approval', 'waiting_capacity', 'succeeded', 'failed', 'canceling', 'canceled', 'interrupted']);
+export const stateSchema = z.enum(['queued', 'running', 'waiting_approval', 'waiting_input', 'waiting_capacity', 'succeeded', 'failed', 'canceling', 'canceled', 'interrupted']);
 export type State = z.infer<typeof stateSchema>;
 export const terminalStates: ReadonlySet<State> = new Set(['succeeded', 'failed', 'canceled', 'interrupted']);
+export const providerIdSchema = z.enum(['codex', 'claude']);
+export type ProviderId = z.infer<typeof providerIdSchema>;
+export const providerNames: Record<ProviderId, string> = { codex: 'Codex', claude: 'Claude' };
 export const createRunSchema = z.object({
   goal: z.string().trim().min(5).max(6000),
   workspace: z.string().trim().min(3).max(500),
@@ -12,6 +15,7 @@ export const createRunSchema = z.object({
   sessionId: z.string().uuid().optional(),
   workflowId: workflowIdSchema.optional(),
   mode: z.enum(['read-only', 'workspace-write']).default('read-only'),
+  provider: providerIdSchema.optional(),
 }).strict();
 export type CreateRun = z.infer<typeof createRunSchema>;
 export const createProjectSessionSchema = z.object({ name: z.string().trim().min(1).max(80), workspace: z.string().trim().min(3).max(500), workflowId: workflowIdSchema.optional() }).strict();
@@ -23,16 +27,38 @@ export interface FolderEntry { name: string; path: string; selectable: boolean }
 export interface FolderPage {
   root: string; path: string; entries: FolderEntry[]; nextCursor: string | null; truncated: boolean;
 }
+export interface AgentTodo { text: string; status: 'pending' | 'in_progress' | 'completed' }
 export interface Task {
   id: string; role: Role; title: string; state: State;
   summary: string; threadId?: string; turnId?: string;
   inputTokens: number | null; outputTokens: number | null;
   handoff?: string; inheritedFromTaskId?: string; observedWrites?: boolean;
   usageAttempts?: { inputTokens: number | null; outputTokens: number | null }[];
+  provider?: ProviderId;
+  /** Latest checklist the agent reported itself (Claude TodoWrite, Codex plan update). */
+  todos?: AgentTodo[];
+  /** Short observed description of the current action, e.g. the command being run. */
+  activity?: string;
+  interruptions?: number; questionRounds?: number;
 }
 export interface Approval {
   id: string; taskId: string; method: string; description: string;
   requestedAt: string; state: 'pending' | 'accepted' | 'declined' | 'expired';
+}
+export interface InquiryQuestion { question: string; header?: string; options: { label: string; description?: string }[]; multiSelect: boolean }
+export interface Inquiry {
+  id: string; taskId: string;
+  /** live: the agent is paused mid-turn; turn_output: the role finished a turn with blocking questions. */
+  source: 'live' | 'turn_output';
+  questions: InquiryQuestion[]; requestedAt: string;
+  state: 'pending' | 'answered' | 'skipped' | 'expired';
+  answers?: string[]; response?: string; answeredAt?: string;
+}
+export interface UserNote {
+  id: string; text: string; createdAt: string; taskId: string | null;
+  /** interrupt: stop the current turn and redo the step; steer: deliver live if possible; queued: next turn. */
+  mode: 'interrupt' | 'steer' | 'queued';
+  delivery: 'pending' | 'live' | 'prompt' | 'discarded';
 }
 export interface Run {
   id: string; goal: string; workspace: string; mode: CreateRun['mode'];
@@ -44,6 +70,9 @@ export interface Run {
   lastSequence: number;
   failureCode?: string; retryOfRunId?: string;
   waiting?: { reason: 'spacing' | 'rate_limit'; until: string; attempt: number };
+  /** Absent on runs created before v0.6, which always used Codex. */
+  provider?: ProviderId;
+  inquiries?: Inquiry[]; notes?: UserNote[];
 }
 export interface OfficeEvent {
   schemaVersion: 1; eventId: string; runId: string; taskId: string | null;
@@ -51,29 +80,48 @@ export interface OfficeEvent {
   payload: Record<string, unknown>;
 }
 export interface ProviderStatus {
-  id: 'codex'; state: 'ready' | 'signed_out' | 'unavailable' | 'billing_mismatch';
-  billingMode: 'chatgpt' | 'apiKey' | 'unknown';
+  id: ProviderId; state: 'ready' | 'signed_out' | 'unavailable' | 'billing_mismatch';
+  billingMode: 'chatgpt' | 'claude_subscription' | 'apiKey' | 'unknown';
   plan: string | null; message: string;
   models: { id: string; name: string; isDefault: boolean }[];
   limits: { usedPercent: number | null; resetsAt: number | null } | null;
   limitWindows?: { usedPercent: number; resetsAt: number | null; name: string }[];
+  /** live: questions and steering reach the agent mid-turn; turn: only between turns. */
+  interaction?: { questions: 'live' | 'turn'; steer: boolean };
+  version?: string;
 }
 export interface SchedulingState { nextAllowedAt: number; rateLimitStreak: number }
-export interface SchedulingStatus { minGapMs: number; maxRetries: number; cooldownUntil: string | null; rateLimitStreak: number }
+export interface SchedulingStatus { provider?: ProviderId; minGapMs: number; maxRetries: number; cooldownUntil: string | null; rateLimitStreak: number }
 export const retryRunSchema = z.object({ version: z.number().int().positive() }).strict();
 export interface Page<T> { data: T[]; meta: { traceId: string; nextCursor: string | null } }
 export interface Envelope<T> { data: T; meta: { traceId: string } }
 export const approvalDecisionSchema = z.object({
   decision: z.enum(['accept', 'decline']), version: z.number().int().positive(),
 }).strict();
+export const inquiryAnswerSchema = z.object({
+  answers: z.array(z.string().trim().max(2000)).max(4).default([]),
+  response: z.string().trim().max(4000).optional(),
+  skip: z.boolean().default(false),
+}).strict();
+export type InquiryAnswer = z.infer<typeof inquiryAnswerSchema>;
+export const userNoteSchema = z.object({
+  text: z.string().trim().min(1).max(4000), mode: z.enum(['interrupt', 'steer', 'queued']).default('steer'),
+}).strict();
+export interface AttentionItem {
+  kind: 'inquiry' | 'approval'; id: string; runId: string; taskId: string; goal: string;
+  role: string; title: string; requestedAt: string; provider: ProviderId;
+}
 
-export const planOutputSchema = z.object({ summary: z.string().max(4000), steps: z.array(z.string().max(1000)).min(1).max(8) }).strict();
+// Every role may end a turn with blocking questions for the user. The default keeps older outputs valid.
+const questions = z.array(z.string().max(1000)).max(4).default([]);
+export const planOutputSchema = z.object({ summary: z.string().max(4000), steps: z.array(z.string().max(1000)).min(1).max(8), questions }).strict();
 export const buildOutputSchema = z.object({
   summary: z.string().max(8000), blocked: z.boolean(),
   files: z.array(z.string().max(500)).max(100),
   tests: z.array(z.object({ command: z.string().max(2000), passed: z.boolean(), evidence: z.string().max(2000) }).strict()).max(20),
+  questions,
 }).strict();
-export const reviewOutputSchema = z.object({ approved: z.boolean(), summary: z.string().max(6000), findings: z.array(z.string().max(2000)).max(20) }).strict();
+export const reviewOutputSchema = z.object({ approved: z.boolean(), summary: z.string().max(6000), findings: z.array(z.string().max(2000)).max(20), questions }).strict();
 export const checkOutputSchema = reviewOutputSchema.extend({ tests: buildOutputSchema.shape.tests });
 export interface ToolResult { command: string; exitCode: number | null }
 export interface TurnResult { text: string; tools: ToolResult[]; changedFiles: boolean }

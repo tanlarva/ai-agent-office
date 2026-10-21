@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { OfficeEvent, ProviderStatus, Run, ProjectSession, SchedulingStatus } from '../shared/contracts';
+import type { OfficeEvent, ProviderId, ProviderStatus, Run, ProjectSession, SchedulingStatus } from '../shared/contracts';
 import { api, errorMessage, mergeEvents } from './api';
 
 export type Connection = 'idle' | 'connecting' | 'live' | 'reconnecting';
+// Enough history for the debug console of one role without unbounded memory.
+const EVENT_BUFFER = 800;
 
 export function useOffice() {
-  const [scheduling, setScheduling] = useState<SchedulingStatus | null>(null);
+  const [scheduling, setScheduling] = useState<Partial<Record<ProviderId, SchedulingStatus>>>({});
   const [runs, setRuns] = useState<Run[]>([]);
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
   const [sessions, setSessions] = useState<ProjectSession[]>([]);
@@ -43,9 +45,9 @@ export function useOffice() {
     void (async () => {
       try {
         await api.session(controller.signal);
-        const [providerResponse, runResponse, sessionsResponse, schedulingResponse] = await Promise.all([api.providers(controller.signal), api.runs(controller.signal, sessionFilter), api.projectSessions(controller.signal), api.scheduling(controller.signal)]);
+        const [providerResponse, runResponse, sessionsResponse, schedulingResponse] = await Promise.all([api.providers(controller.signal), api.runs(controller.signal, sessionFilter), api.projectSessions(controller.signal), Promise.all([api.scheduling(controller.signal, 'codex'), api.scheduling(controller.signal, 'claude')])]);
         if (controller.signal.aborted) return;
-        setProviders(providerResponse.data); setScheduling(schedulingResponse.data);
+        setProviders(providerResponse.data); setScheduling({ codex: schedulingResponse[0].data, claude: schedulingResponse[1].data });
         setRuns(runResponse.data);
         setSessions(sessionsResponse.data); setSessionCursor(sessionsResponse.meta.nextCursor);
         selectRun(current => current && runResponse.data.some(run => run.id === current) ? current : runResponse.data[0]?.id ?? null);
@@ -79,7 +81,7 @@ export function useOffice() {
       while (more && !controller.signal.aborted) {
         const page = await api.events(id, cursor, controller.signal);
         if (controller.signal.aborted) return;
-        setEvents(current => mergeEvents(current, page.data));
+        setEvents(current => mergeEvents(current, page.data, EVENT_BUFFER));
         const next = page.data.at(-1)?.sequence;
         more = page.meta.nextCursor !== null && next !== undefined && next > cursor;
         if (next !== undefined) {
@@ -132,7 +134,7 @@ export function useOffice() {
             setEventError(item.message);
           } else if ('sequence' in item && item.runId === id) {
             sequence = Math.max(sequence, item.sequence);
-            setEvents(current => mergeEvents(current, [item]));
+            setEvents(current => mergeEvents(current, [item], EVENT_BUFFER));
             void fetchSnapshot();
           }
         } catch { setEventError('Không đọc được một sự kiện. Hãy tải lại để đồng bộ.'); }

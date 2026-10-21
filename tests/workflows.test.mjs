@@ -62,8 +62,16 @@ for (const workflow of workflows) test(`${workflow.id}: dispatches actual ordere
   assert.equal(calls.every(call => call.prompt.includes('ORIGINAL-ACCEPTANCE')), true);
   assert.deepEqual(result.workflow, getWorkflow(workflow.id));
   run.workflow.steps[0].name = 'Client mutation';
-  assert.equal((await store.get(run.id)).workflow.steps[0].name, 'Orchestrator');
-  assert.equal(getWorkflow(workflow.id).steps[0].name, 'Orchestrator');
+  const first = workflow.steps[0].name;
+  assert.equal((await store.get(run.id)).workflow.steps[0].name, first);
+  assert.equal(getWorkflow(workflow.id).steps[0].name, first);
+});
+
+test('multi-role workflows start with the Orchestrator; only the solo template uses one self-checking agent', () => {
+  for (const workflow of workflows.filter(item => item.steps.length > 1)) assert.equal(workflow.steps[0].role, 'orchestrator', workflow.id);
+  const solo = getWorkflow('solo');
+  assert.equal(solo.steps.length, 1);
+  assert.deepEqual([solo.steps[0].kind, solo.steps[0].writable], ['work', true]);
 });
 
 test('project workflow defaults persist; per-run override preserves session and legacy fallback', async t => {

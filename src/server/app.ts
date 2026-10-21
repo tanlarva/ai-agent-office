@@ -5,19 +5,20 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { approvalDecisionSchema, createRunSchema, createProjectSessionSchema, retryRunSchema, type OfficeEvent, type ProviderStatus } from '../shared/contracts.js';
+import { approvalDecisionSchema, createRunSchema, createProjectSessionSchema, inquiryAnswerSchema, providerIdSchema, retryRunSchema, userNoteSchema, type OfficeEvent, type ProviderId, type ProviderStatus } from '../shared/contracts.js';
 import { ProjectSessions } from './project-sessions.js';
 import { FolderBrowser } from './folders.js';
 import { OfficeError } from './errors.js';
 import { Runtime } from './runtime.js';
 import type { Store } from './store.js';
-import type { Provider } from './codex.js';
+import type { Provider, ProviderMap } from './provider.js';
 import { schedulingFromEnv, type SchedulingOptions } from './scheduling.js';
 
-export async function createApp(options: { root: string; store: Store; provider: Provider; port?: number; logger?: boolean; timeoutMs?: number; scheduling?: SchedulingOptions }) {
+export async function createApp(options: { root: string; store: Store; provider?: Provider; providers?: ProviderMap; port?: number; logger?: boolean; timeoutMs?: number; scheduling?: SchedulingOptions }) {
   const port = options.port ?? 4310;
   const app = Fastify({ logger: options.logger ? { redact: ['req.headers.cookie', 'req.headers.authorization', 'req.headers.x-csrf-token'], serializers: { req: req => ({ method: req.method, url: req.url?.split('?')[0] }) } } : false, bodyLimit: 32_000, logController: new LogController({ disableRequestLogging: true }) });
-  const runtime = new Runtime(options.store, options.provider, { appRoot: options.root, allowedRoot: process.env.OFFICE_WORKSPACE_ROOT, timeoutMs: options.timeoutMs, scheduling: options.scheduling ?? schedulingFromEnv(process.env) });
+  const providers: ProviderMap = options.providers ?? (options.provider ? { [options.provider.id ?? 'codex']: options.provider } : {});
+  const runtime = new Runtime(options.store, providers, { appRoot: options.root, allowedRoot: process.env.OFFICE_WORKSPACE_ROOT, timeoutMs: options.timeoutMs, scheduling: options.scheduling ?? schedulingFromEnv(process.env) });
   await runtime.recover();
   const projectSessions = new ProjectSessions(options.store, options.root, process.env.OFFICE_WORKSPACE_ROOT);
   const folders = new FolderBrowser(options.root, process.env.OFFICE_WORKSPACE_ROOT);
@@ -28,12 +29,17 @@ export async function createApp(options: { root: string; store: Store; provider:
   const envelope = <T>(data: T, traceId: string) => ({ data, meta: { traceId } });
   const pageQuery = z.object({ limit: z.coerce.number().int().min(1).max(200).default(50), cursor: z.string().uuid().optional() });
   const eventQuery = z.object({ after: z.coerce.number().int().min(0).default(0), limit: z.coerce.number().int().min(1).max(200).default(100) });
-  let statusCache: { value: ProviderStatus; time: number } | undefined;
-  let statusPending: Promise<ProviderStatus> | undefined;
-  const status = async () => {
-    if (statusCache && Date.now() - statusCache.time < 15_000) return statusCache.value;
-    statusPending ??= options.provider.status().then(value => { statusCache = { value, time: Date.now() }; return value; }).finally(() => { statusPending = undefined; });
-    return statusPending;
+  const statusCache = new Map<ProviderId, { value: ProviderStatus; time: number }>();
+  const statusPending = new Map<ProviderId, Promise<ProviderStatus>>();
+  const status = async (id: ProviderId) => {
+    const cached = statusCache.get(id);
+    if (cached && Date.now() - cached.time < 15_000) return cached.value;
+    let pending = statusPending.get(id);
+    if (!pending) {
+      pending = providers[id]!.status().then(value => { statusCache.set(id, { value, time: Date.now() }); return value; }).finally(() => { statusPending.delete(id); });
+      statusPending.set(id, pending);
+    }
+    return pending;
   };
   app.addHook('onRequest', async (request, reply) => {
     if (!hosts.has(request.headers.host ?? '') || (request.headers.origin && !origins.has(request.headers.origin)))
@@ -68,8 +74,12 @@ export async function createApp(options: { root: string; store: Store; provider:
     reply.header('Set-Cookie', `office_session=${session}; HttpOnly; SameSite=Strict; Path=/`);
     reply.header('Cache-Control', 'no-store'); return envelope({ csrfToken }, request.id);
   });
-  app.get('/api/providers', async request => envelope([await status()], request.id));
-  app.get('/api/scheduling', async request => envelope(await runtime.governor.status(), request.id));
+  app.get('/api/providers', async request => envelope(await Promise.all(runtime.providerIds().map(status)), request.id));
+  app.get('/api/scheduling', async request => {
+    const query = z.object({ provider: providerIdSchema.default('codex') }).parse(request.query);
+    return envelope(await runtime.governorFor(query.provider).status(), request.id);
+  });
+  app.get('/api/attention', async request => envelope(runtime.attention(), request.id));
   app.get('/api/runs', async request => {
     const query = pageQuery.extend({ sessionId: z.string().uuid().optional() }).parse(request.query);
     const rows = await options.store.list(query.limit + 1, query.cursor, query.sessionId);
@@ -114,15 +124,28 @@ export async function createApp(options: { root: string; store: Store; provider:
     return { data: events.slice(0, query.limit), meta: { traceId: request.id, nextCursor: events.length > query.limit ? String(events[query.limit - 1]?.sequence) : null } };
   });
   app.post('/api/runs/:id/cancellations', async (request, reply) => reply.code(202).send(envelope(await runtime.cancel(runId(request.params)), request.id)));
+  app.post('/api/runs/:id/notes', async (request, reply) => {
+    const input = userNoteSchema.parse(request.body);
+    return reply.code(201).send(envelope(await runtime.note(runId(request.params), input.text, input.mode), request.id));
+  });
+  app.post('/api/inquiries/:id/answers', async request => {
+    const input = inquiryAnswerSchema.parse(request.body);
+    return envelope(await runtime.answer(runId(request.params), input), request.id);
+  });
   app.post('/api/approvals/:id/decisions', async request => {
     const input = approvalDecisionSchema.parse(request.body);
     return envelope(await runtime.decide(runId(request.params), input.decision, input.version), request.id);
   });
+  const attentionEvents = new Set(['inquiry.requested', 'approval.requested', 'inquiry.answered', 'approval.resolved', 'request.expired', 'run.completed']);
   await app.register(websocket, { options: { maxPayload: 4096 } });
   app.get('/api/events', { websocket: true }, socket => {
     let subscribed: string | null = null;
     const send = (value: unknown) => { if (socket.readyState === 1) { if (socket.bufferedAmount > 1_000_000) socket.close(1013, 'Slow client'); else socket.send(JSON.stringify(value)); } };
-    const listener = (event: OfficeEvent) => { if (event.runId === subscribed) send(event); };
+    // Questions and approvals reach every open tab so the user is notified even while viewing another run.
+    const listener = (event: OfficeEvent) => {
+      if (event.runId === subscribed) send(event);
+      else if (attentionEvents.has(event.type)) send({ type: 'attention', runId: event.runId, event: event.type });
+    };
     runtime.on('event', listener);
     socket.on('close', () => runtime.off('event', listener));
     socket.on('error', () => runtime.off('event', listener));

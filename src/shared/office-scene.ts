@@ -20,6 +20,7 @@ export const officeThemes: Record<WorkflowId, OfficeTheme> = {
   content: { id: 'content', name: 'Toà soạn nội dung', description: 'Bản thảo · tư liệu · bàn biên tập', background: '#29231b', floor: '#40372c', wall: '#574938', edge: '#8a7658', accent: '#e9c88b', secondary: '#a9c5ad', desk: '#d6c2a1', rug: '#65553e', stations: [[-3.6, -3.3], [4.1, -3.3], [-4.1, 0.9], [3.6, 0.9]], feature: 'editorial' },
   audit: { id: 'audit', name: 'Phòng kiểm toán', description: 'Hồ sơ · bằng chứng · soát xét độc lập', background: '#17252b', floor: '#293e46', wall: '#35505b', edge: '#617e89', accent: '#9ed1cc', secondary: '#d5bd8d', desk: '#c7c5b8', rug: '#375760', stations: five, feature: 'records' },
   quick: { id: 'quick', name: 'Phòng cộng tác', description: 'Lập kế hoạch · thực hiện · bàn giao', background: '#19231e', floor: '#2c3930', wall: '#3b4d3e', edge: '#687a60', accent: '#c5d5a5', secondary: '#e8bd83', desk: '#d0c7ad', rug: '#4c6047', stations: [[0, -3.3], [-4.2, 0.7], [4.2, 0.7]], feature: 'lounge' },
+  solo: { id: 'solo', name: 'Góc làm việc riêng', description: 'Một bàn · tập trung · tự kiểm tra', background: '#1f1b2b', floor: '#302a40', wall: '#3f3655', edge: '#6d6190', accent: '#f0b48a', secondary: '#9fd4c4', desk: '#d4c9b8', rug: '#4c4166', stations: [[0, -3.3]], feature: 'lounge' },
 };
 export function officeThemeForRun(run: Run | null): OfficeTheme {
   return officeThemes[run?.workflow?.id ?? (run ? 'quick' : 'software')];
@@ -52,7 +53,7 @@ export function samplePath(points: readonly Point[], distance: number): { positi
   return { position: points.at(-1)!, heading, finished: true };
 }
 export function isLivePose(state: State | undefined): boolean {
-  return state === 'running' || state === 'waiting_approval' || state === 'waiting_capacity';
+  return state === 'running' || state === 'waiting_approval' || state === 'waiting_input' || state === 'waiting_capacity';
 }
 // Only a transition witnessed in this mounted run causes a handoff, never a historical snapshot.
 export function shouldHandoff(previous: State | undefined, current: State | undefined): boolean {

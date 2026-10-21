@@ -1,4 +1,6 @@
 import { CodexProvider } from './codex.js';
-const result = await new CodexProvider(process.cwd()).status();
-console.log(JSON.stringify(result, null, 2));
-process.exitCode = result.state === 'ready' ? 0 : 1;
+import { ClaudeProvider } from './claude.js';
+// Handshake only: account mode, model catalog and limits. Never sends a prompt to a model.
+const results = await Promise.all([new CodexProvider(process.cwd()).status(), new ClaudeProvider(process.cwd()).status()]);
+console.log(JSON.stringify(results, null, 2));
+process.exitCode = results.some(result => result.state === 'ready') ? 0 : 1;

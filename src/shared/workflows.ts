@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const roleSchema = z.enum(['orchestrator', 'builder', 'reviewer', 'business-analyst', 'developer', 'qa', 'researcher', 'strategist', 'copywriter', 'editor', 'ux', 'designer', 'design-reviewer', 'analyst', 'writer', 'audit-risk', 'audit-evidence', 'audit-reporter', 'audit-reviewer']);
 export type Role = z.infer<typeof roleSchema>;
-export const workflowIdSchema = z.enum(['software', 'marketing', 'design', 'business', 'research', 'content', 'audit', 'quick']);
+export const workflowIdSchema = z.enum(['software', 'marketing', 'design', 'business', 'research', 'content', 'audit', 'quick', 'solo']);
 export type WorkflowId = z.infer<typeof workflowIdSchema>;
 export interface WorkflowStep {
   role: Role; name: string; specialty: string; kind: 'plan' | 'work' | 'check' | 'review';
@@ -57,6 +57,9 @@ export const workflows: readonly WorkflowDefinition[] = [
   { id: 'quick', version: 1, name: 'Tổng quát', description: 'Quy trình gọn tương thích phiên cũ: kế hoạch → thực hiện → review.', steps: [planner,
     step('builder', 'Builder', 'Thực hiện & kiểm chứng', 'work', true, 'Follow the plan and produce the requested result within the workspace. Run meaningful checks after any changes.'),
     step('reviewer', 'Reviewer', 'Đánh giá & bàn giao', 'review', false, 'Independently inspect the workspace and handoffs for correctness, security and incomplete goals. Approve only if goal and required checks are satisfied.'),
+  ] },
+  { id: 'solo', version: 1, name: 'Một agent', description: 'Việc nhỏ: một nhân viên tự làm, tự kiểm tra; ít lượt model nhất.', steps: [
+    step('builder', 'Nhân viên tổng hợp', 'Làm trọn gói & tự kiểm chứng', 'work', true, 'Handle this small task alone: inspect, make the minimal change or analysis, then run meaningful checks after any change. There is no separate reviewer, so state residual risks explicitly.'),
   ] },
 ];
 export function getWorkflow(id: WorkflowId = 'quick'): WorkflowDefinition {
