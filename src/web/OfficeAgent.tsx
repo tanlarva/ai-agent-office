@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { CanvasTexture, SRGBColorSpace, SpriteMaterial, type Group, type Mesh } from 'three';
 import type { ProviderId, State } from '../shared/contracts';
 import type { WorkflowStep } from '../shared/workflows';
 import { dockFor, handoffPath, isLivePose, pathLength, samplePath, shouldHandoff, type OfficeTheme, type Point } from '../shared/office-scene';
 import { Block, cylinder, geometries, material, materials } from './OfficeFurniture';
+import { AnimeModel, type ModelStatus } from './AnimeModel';
+import type { CastMember } from './anime-cast';
+import { restingMotion } from './agent-pose';
 
 interface Journey { points: readonly Point[]; back: readonly Point[]; length: number; elapsed: number }
 const providerColor: Record<ProviderId, string> = { codex: '#7ed7df', claude: '#e48a64' };
@@ -17,7 +20,7 @@ const dampAngle = (current: number, target: number, lambda: number, dt: number) 
 };
 
 /** Floating name tag drawn once per change into a canvas sprite: role, and what it is doing now. */
-function NameTag({ name, status, color }: { name: string; status: string; color: string }) {
+function NameTag({ name, status, color, height = 2.66 }: { name: string; status: string; color: string; height?: number }) {
   const canvas = useMemo(() => Object.assign(document.createElement('canvas'), { width: 512, height: 128 }), []);
   const texture = useMemo(() => { const value = new CanvasTexture(canvas); value.colorSpace = SRGBColorSpace; return value; }, [canvas]);
   const sprite = useMemo(() => new SpriteMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false }), [texture]);
@@ -35,7 +38,7 @@ function NameTag({ name, status, color }: { name: string; status: string; color:
     texture.needsUpdate = true;
   }, [canvas, texture, name, status, color]);
   useEffect(() => () => { texture.dispose(); sprite.dispose(); }, [texture, sprite]);
-  return <sprite material={sprite} position={[0, 2.66, 0]} scale={[2.4, 0.6, 1]} renderOrder={10} />;
+  return <sprite material={sprite} position={[0, height, 0]} scale={[2.4, 0.6, 1]} renderOrder={10} />;
 }
 
 function Accessory({ kind, color }: { kind: WorkflowStep['kind'] | undefined; color: string }) {
@@ -56,10 +59,16 @@ function Accessory({ kind, color }: { kind: WorkflowStep['kind'] | undefined; co
   return null;
 }
 
-export function OfficeAgent({ station, index, color, state, kind, provider, name, status, thinking, selected, motionDisabled, theme, onSelect }: {
+export function OfficeAgent({ station, index, color, state, kind, provider, name, status, thinking, selected, motionDisabled, theme, onSelect, anime = false, member, onModelStatus }: {
   station: Point; index: number; color: string; state: State | undefined; kind?: WorkflowStep['kind']; provider: ProviderId;
-  name: string; status: string; thinking: boolean; selected: boolean; motionDisabled: boolean; theme: OfficeTheme; onSelect?: () => void;
+  name: string; status: string; thinking: boolean; selected: boolean; motionDisabled: boolean; theme: OfficeTheme; onSelect?: () => void; anime?: boolean; member?: CastMember; onModelStatus?: (id: string, status: ModelStatus) => void;
 }) {
+  const [modelLoaded, setModelLoaded] = useState(false);
+  const motion = useRef(restingMotion());
+  const handleModelStatus = useCallback((id: string, status: ModelStatus) => {
+    setModelLoaded(status === 'ready'); onModelStatus?.(id, status);
+  }, [onModelStatus]);
+  const bubbleHeight = member && modelLoaded ? member.height + 0.35 : 2.05;
   const root = useRef<Group>(null), body = useRef<Group>(null), head = useRef<Group>(null);
   const leftArm = useRef<Group>(null), rightArm = useRef<Group>(null), leftLeg = useRef<Group>(null), rightLeg = useRef<Group>(null);
   const leftEye = useRef<Mesh>(null), rightEye = useRef<Mesh>(null), magnifier = useRef<Group>(null);
@@ -98,6 +107,7 @@ export function OfficeAgent({ station, index, color, state, kind, provider, name
     }
     const live = isLivePose(state), still = motionDisabled;
     const mode = walking ? 'walk' : atDelivery ? 'celebrate' : state === 'running' ? 'work' : state === 'waiting_input' ? 'ask' : state === 'waiting_approval' ? 'approve' : state === 'waiting_capacity' ? 'wait' : state === 'failed' ? 'sad' : state === 'succeeded' ? 'happy' : 'idle';
+    Object.assign(motion.current, { time: t, walking, working: mode === 'work', waiting: ['ask', 'approve', 'wait'].includes(mode), carrying, atDelivery, disabled: still, asking: mode === 'ask', celebrating: mode === 'celebrate', thinking, sad: mode === 'sad' });
     if (!trip || motionDisabled) heading = mode === 'work' ? Math.PI : ['ask', 'approve', 'happy', 'sad'].includes(mode) ? towardUser : Math.PI * 0.16 + (still ? 0 : Math.sin(t * 0.21 + index) * 0.25);
     const typing = thinking ? 5 : 11;
     const target = {
@@ -134,7 +144,7 @@ export function OfficeAgent({ station, index, color, state, kind, provider, name
     const eyeY = t < b.until ? 0.12 : mode === 'happy' || mode === 'celebrate' ? 0.4 : mode === 'sad' ? 0.55 : 1;
     if (leftEye.current) leftEye.current.scale.y = damp(leftEye.current.scale.y, eyeY * 0.055, 30, dt);
     if (rightEye.current) rightEye.current.scale.y = damp(rightEye.current.scale.y, eyeY * 0.055, 30, dt);
-    if (bubble.current) { bubble.current.position.y = 2.05 + (still ? 0 : Math.sin(t * 2.6) * 0.06); bubble.current.rotation.y = still ? 0 : Math.sin(t * 1.3) * 0.4; }
+    if (bubble.current) { bubble.current.position.y = bubbleHeight + (still ? 0 : Math.sin(t * 2.6) * 0.06); bubble.current.rotation.y = still ? 0 : Math.sin(t * 1.3) * 0.4; }
     if (dots.current) dots.current.children.forEach((dot, i) => { dot.position.y = still ? 0 : Math.max(0, Math.sin(t * 6 - i * 0.8)) * 0.08; });
     if (halo.current) { const pulse = selected && !still ? 1 + Math.sin(t * 4) * 0.05 : 1; halo.current.scale.set(pulse, pulse, pulse); }
     // Demand rendering: keep frames coming only while something moves; the scene ticker covers idle life.
@@ -150,6 +160,7 @@ export function OfficeAgent({ station, index, color, state, kind, provider, name
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}><circleGeometry args={[0.46, 24]} /><meshBasicMaterial color="#000000" transparent opacity={0.22} depthWrite={false} /></mesh>
     <mesh ref={halo} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}><ringGeometry args={[selected ? 0.5 : 0.45, selected ? 0.6 : 0.49, 40]} /><meshBasicMaterial color={selected ? '#ffffff' : glow ? light : theme.edge} transparent opacity={selected ? 0.9 : 0.8} /></mesh>
     <group ref={body}>
+      <group visible={!member || !modelLoaded}>
       <group ref={leftLeg} position={[-0.17, 0.38, 0]}><Block position={[0, -0.16, 0]} size={[0.19, 0.31, 0.23]} color={materials.metal} /><Block position={[0, -0.3, 0.05]} size={[0.23, 0.12, 0.32]} color={materials.bot} /></group>
       <group ref={rightLeg} position={[0.17, 0.38, 0]}><Block position={[0, -0.16, 0]} size={[0.19, 0.31, 0.23]} color={materials.metal} /><Block position={[0, -0.3, 0.05]} size={[0.23, 0.12, 0.32]} color={materials.bot} /></group>
       <mesh position={[0, 0.68, 0]} castShadow material={material(materials.bot, false, 0.45)}><capsuleGeometry args={[0.28, 0.32, 4, 14]} /></mesh>
@@ -162,8 +173,14 @@ export function OfficeAgent({ station, index, color, state, kind, provider, name
         <Block position={[0, 0.01, 0.27]} size={[0.48, 0.22, 0.13]} color={materials.visor} />
         <mesh ref={leftEye} geometry={geometries.box} material={material(light, glow || state === 'succeeded')} position={[-0.11, 0.025, 0.343]} scale={[0.07, 0.055, 0.02]} />
         <mesh ref={rightEye} geometry={geometries.box} material={material(light, glow || state === 'succeeded')} position={[0.11, 0.025, 0.343]} scale={[0.07, 0.055, 0.02]} />
-        <Block position={[0, 0.4, 0]} size={[0.035, 0.15, 0.035]} color={materials.metal} />
-        <mesh position={[0, 0.51, 0]} material={material(chest, glow)}><sphereGeometry args={[0.065, 12, 10]} /></mesh>
+        {anime ? <>{[-1, 1].map(side => <group key={side}>
+          <mesh position={[side * 0.24, 0.31, 0]} rotation={[0, Math.PI / 4, side * -0.22]} material={material(materials.bot)}><coneGeometry args={[0.145, 0.29, 4]} /></mesh>
+          <mesh position={[side * 0.24, 0.32, 0.07]} rotation={[0, Math.PI / 4, side * -0.22]} material={material(color)}><coneGeometry args={[0.075, 0.18, 4]} /></mesh>
+          <Block position={[side * 0.22, -0.09, 0.29]} size={[0.09, 0.035, 0.025]} color={materials.blush} />
+        </group>)}</> : <>
+          <Block position={[0, 0.4, 0]} size={[0.035, 0.15, 0.035]} color={materials.metal} />
+          <mesh position={[0, 0.51, 0]} material={material(chest, glow)}><sphereGeometry args={[0.065, 12, 10]} /></mesh>
+        </>}
       </group>
       <Accessory kind={kind} color={color} />
       <group ref={leftArm} position={[-0.37, 0.87, 0]}><Block position={[0, -0.17, 0]} size={[0.14, 0.36, 0.16]} color={materials.bot} /><Block position={[0, -0.36, 0]} size={[0.16, 0.11, 0.18]} color={materials.metal} />
@@ -172,8 +189,10 @@ export function OfficeAgent({ station, index, color, state, kind, provider, name
       <group ref={rightArm} position={[0.37, 0.87, 0]}><Block position={[0, -0.17, 0]} size={[0.14, 0.36, 0.16]} color={materials.bot} /><Block position={[0, -0.36, 0]} size={[0.16, 0.11, 0.18]} color={materials.metal} />
         <group ref={parcel} visible={false} position={[0, -0.42, 0.07]}><Block position={[0, 0, 0]} size={[0.43, 0.31, 0.09]} color={theme.secondary} /><Block position={[0, 0.05, 0.05]} size={[0.3, 0.045, 0.015]} color={materials.paper} /></group>
       </group>
+      </group>
+      {member && <AnimeModel member={member} motion={motion} color={color} onStatus={handleModelStatus} />}
     </group>
-    <group ref={bubble} position={[0, 2.05, 0]}>
+    <group ref={bubble} position={[0, bubbleHeight, 0]}>
       {state === 'waiting_input' && <group><mesh geometry={cylinder(24)} material={material('#f6cb8b', true)} rotation={[Math.PI / 2, 0, 0]} scale={[0.24, 0.05, 0.24]} />
         <Block position={[0.02, 0.07, 0.03]} size={[0.06, 0.12, 0.02]} color={materials.visor} /><Block position={[-0.03, 0.12, 0.03]} size={[0.1, 0.04, 0.02]} color={materials.visor} /><Block position={[0, -0.09, 0.03]} size={[0.05, 0.05, 0.02]} color={materials.visor} /></group>}
       {state === 'waiting_approval' && <group><mesh geometry={cylinder(6)} material={material(color, true)} rotation={[Math.PI / 2, 0, 0]} scale={[0.2, 0.05, 0.24]} /><Block position={[0, 0, 0.03]} size={[0.05, 0.16, 0.02]} color={materials.paper} /></group>}
@@ -182,6 +201,6 @@ export function OfficeAgent({ station, index, color, state, kind, provider, name
       {state === 'succeeded' && <group rotation={[0, 0, -Math.PI / 5]}><Block position={[-0.06, -0.025, 0]} size={[0.06, 0.14, 0.045]} color={light} glow /><Block position={[0.035, 0.045, 0]} size={[0.06, 0.28, 0.045]} color={light} glow /></group>}
       {state === 'running' && thinking && <group ref={dots}>{[-1, 0, 1].map(i => <mesh key={i} geometry={geometries.box} material={material(light, true)} position={[i * 0.13, 0, 0]} scale={[0.07, 0.07, 0.07]} />)}</group>}
     </group>
-    <NameTag name={name} status={status} color={chest} />
+    <NameTag name={name} status={status} color={chest} height={Math.max(2.66, bubbleHeight + 0.55)} />
   </group>;
 }

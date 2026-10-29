@@ -4,7 +4,7 @@ import { BoxGeometry, CanvasTexture, CylinderGeometry, IcosahedronGeometry, Mesh
 import type { OfficeTheme } from '../shared/office-scene';
 
 type Vector = [number, number, number];
-export const materials = { metal: '#26343d', bot: '#e7e6de', visor: '#15282f', paper: '#ece5d2', leaf: '#71977d' };
+export const materials = { metal: '#26343d', bot: '#e7e6de', visor: '#15282f', paper: '#ece5d2', leaf: '#71977d', blush: '#e79fb3' };
 
 // One geometry per primitive and one material per colour: hundreds of meshes share GPU buffers and
 // shader programs instead of allocating their own. Sizes are applied through mesh scale.

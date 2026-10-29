@@ -72,3 +72,34 @@ Handshake thật với Claude Code 2.1.222 đọc được catalog; chưa có l�
 | --- | --- | --- | --- |
 | P-02-L | Live Claude: đọc, ghi, hỏi, steer, cancel trên workspace mẫu | planned | Cần claude auth login trên máy người dùng |
 | P-01-S | Codex: hỏi giữa lượt / turn steer qua App Server | planned | Xác minh tài liệu App Server trước |
+
+## ANIME-07 — done
+
+Yêu cầu ngày 29/10/2026: thêm phong cách anime nhẹ cho giao diện hiện tại.
+Owner: Integrator; phạm vi src/web, README và tài liệu bàn giao. Không đổi backend/contracts/dependencies.
+Đạt: theme sakura mặc định, chuyển về Cổ điển và nhớ lựa chọn; avatar vector chibi; robot tai mèo;
+2D/3D, form và tham quan đồng bộ theme; không tạo lời gọi model hoặc dữ liệu công việc giả trong luồng thật.
+Check/lint/build pass; 76/76 tests pass; browser desktop, mobile 360/390px, đổi theme/persistence, 2D và dialog.
+Chi tiết và giới hạn: [ANIME-07-integrator](handoffs/ANIME-07-integrator.md).
+
+## ANIME-CAST-08 — done
+
+Owner: Integrator, checkout hiện tại. Người dùng yêu cầu phối các model đã đề xuất ngày 29/10/2026.
+Phạm vi: frontend/scene, assets local không phân phối lại, thư viện VRM chính thức, CSP cho texture blob và tài liệu/test liên quan.
+Đội hình: Yori cho Orchestrator, Amane Type01–04 cho thành viên theo vị trí trong workflow.
+Acceptance: model thật trong 3D, animation khớp runtime/handoff và reduced motion; fallback rõ khi thiếu/lỗi asset;
+không đổi provider, API, DB hoặc quyền workspace.
+Đã tải model chính thức sau khi người dùng tự đăng nhập BOOTH, lắp Yori bản suit và bốn Amane có trang phục.
+Loader/pose/fallback/credits hoàn tất; check/lint/build pass, 82/82 test pass.
+Browser đã xác minh render đủ model và texture, làm việc, bàn giao có di chuyển, dừng, đổi phòng 5/4 vai trò,
+thiếu file hiện robot và thông báo đúng, credits và Cổ điển. Chưa benchmark GPU hoặc inference live.
+Model nằm trong thư mục local bị Git bỏ qua. Xem [bàn giao](handoffs/ANIME-CAST-08-integrator.md).
+
+## MERGE-09 — done
+
+Người dùng pull f3af053 (v0.6) và yêu cầu merge lại. Integrator ghép bảy file conflict từ stash,
+giữ Claude/hỏi đáp/chen ngang/debug/giao việc nhanh/camera/geometry dùng chung và lắp lại Anime + VRM.
+Bổ sung pose anime giơ tay/ăn mừng và mapping Solo; giữ sửa lockfile upstream, đồng bộ version 0.6.0.
+Check/lint/build pass; 111/111 test pass; npm ci --dry-run --ignore-scripts pass.
+Browser provider giả/database riêng: hai provider + QuickAssign + câu hỏi/hộp thư + debug và model thật cùng hiển thị,
+trả lời câu hỏi tiếp tục workflow. Xem [MERGE-09-integrator](handoffs/MERGE-09-integrator.md).

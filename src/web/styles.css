@@ -53,7 +53,7 @@ button { transition: background 160ms ease, border-color 160ms ease, color 160ms
 h1, h2, h3, p { margin: 0; }
 strong { font-weight: 600; }
 svg { flex-shrink: 0; }
-.app-shell { display: flex; min-height: 100vh; }
+.app-shell { display: flex; min-height: 100dvh; background: var(--bg); }
 .sidebar { width: 244px; position: fixed; inset: 0 auto 0 0; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 30px 18px 17px; z-index: 3; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px; text-decoration: none; letter-spacing: -1px; font-size: 24px; font-weight: 650; }
 .brand-icon { display: grid; place-items: center; width: 39px; height: 43px; color: var(--accent); border: 1px solid var(--accent-border); border-radius: 11px; transform: rotate(-4deg); }
@@ -111,6 +111,10 @@ h1 { font-size: 20px; font-weight: 500; letter-spacing: -0.5px; }
 .connection.connected { color: var(--green); border-color: var(--success-border); }
 .connection-controls { display: flex; align-items: center; gap: 8px; }
 .connection-controls > .text-button { min-width: 30px; min-height: 30px; }
+.appearance-switch { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel); margin-left: auto; }
+.appearance-switch button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 10px; min-height: 32px; border: 0; background: transparent; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.appearance-switch button[aria-pressed='true'] { background: var(--accent-surface); color: var(--accent); }
+.appearance-switch button:hover { color: var(--text); }
 .mobile-new { display: none; }
 main { padding: 30px 36px 0; max-width: 1800px; margin: auto; }
 .overview-heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-end; margin: 0 0 25px; }
@@ -131,6 +135,13 @@ main { padding: 30px 36px 0; max-width: 1800px; margin: auto; }
 .view-switch button[aria-pressed='true'] { color: var(--text); background: var(--panel-hover); }
 .scene-canvas { height: 385px; position: relative; }
 .scene-canvas canvas { display: block; }
+.office-scene-host { width: 100%; height: 100%; position: relative; }
+.model-load-note { position: absolute; top: 12px; left: 14px; right: 14px; width: fit-content; max-width: calc(100% - 28px); border: 1px solid var(--border); border-radius: 7px; background: var(--panel); color: var(--muted); padding: 7px 10px; font-size: 10px; line-height: 1.6; pointer-events: none; }
+.model-load-note.has-fallback { color: var(--warning-text); border-color: var(--warning-border); background: var(--warning-surface); }
+.cast-credits { padding: 10px 17px; border-top: 1px solid var(--border); background: var(--panel); font-size: 10px; color: var(--muted); }
+.cast-credits summary { cursor: pointer; width: fit-content; }
+.cast-credits p { margin-top: 8px; line-height: 1.9; }
+.cast-credits a { color: var(--accent); }
 .scene-corner { position: absolute; bottom: 20px; left: 20px; color: var(--subtle); font-size: 7px; letter-spacing: 1.8px; pointer-events: none; }
 .scene-corner > span { margin-left: 7px; color: var(--muted); border: 1px solid var(--border); padding: 4px 5px; border-radius: 3px; }
 .scene-fallback { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; height: 100%; padding: 30px; gap: 14px; color: var(--muted); font-size: 12px; text-align: center; }
@@ -495,3 +506,101 @@ button.map-station:hover:not(:disabled) { border-color: var(--role-color); }
 .debug-meta dd { margin: 0; text-align: right; }
 @media (max-width: 900px) { .debug-body { grid-template-columns: 1fr; } .debug-screen { height: 260px; } .quick-controls > .button { margin-left: 0; width: 100%; } }
 @media (prefers-reduced-motion: reduce) { .bell.has-items, .inquiry-card, .map-station > span, .caret { animation: none !important; } }
+
+/* Sakura is an optional visual layer. Runtime status colors remain semantic. */
+[data-appearance='anime'] {
+  --bg: #14131f;
+  --sidebar: #191724;
+  --panel: #1e1c2c;
+  --panel-raised: #282438;
+  --panel-hover: #343047;
+  --border: #3c354e;
+  --text: #f3edf8;
+  --muted: #bdb1cc;
+  --subtle: #a396b3;
+  --accent: #f4b4ce;
+  --accent-dark: #301a2c;
+  --accent-hover: #ffcee1;
+  --accent-surface: #39283c;
+  --accent-border: #80566f;
+  --green: #a7dec9;
+  --red: #ffb0ad;
+  --scene-bg: #1b192b;
+  --scene-header: #252134;
+  --scene-border: #4a3c59;
+  --grid: #afa0d517;
+  --success-glow: #a7dec91a;
+  --success-border: #4b756b;
+  --success-surface: #253c38;
+  --warning-border: #8c7053;
+  --warning-surface: #3a2e28;
+  --warning-text: #f1d0a5;
+  --error-surface: #3c252f;
+  --error-border: #8c5363;
+  --backdrop: #100d1bd9;
+  --radius: 16px;
+  --portrait-backdrop: #383049;
+  --portrait-hair: #b7a4e2;
+  --portrait-skin: #ffe1d9;
+  --portrait-jacket: #3a354f;
+  --portrait-paper: #fff7fb;
+  --portrait-ink: #493047;
+  --portrait-eye: #765c9e;
+  --portrait-blush: #eca4b7;
+  --welcome-end: #252134;
+  --welcome-halo: #f4b4ce0a;
+  --card-shadow: #09061126;
+}
+[data-appearance='anime'] .topbar { background: var(--sidebar); }
+[data-appearance='anime'] h1,
+[data-appearance='anime'] h2 { font-family: 'Segoe UI', system-ui, sans-serif; font-weight: 600; }
+[data-appearance='anime'] .brand-icon { border-radius: 13px 13px 5px 13px; background: var(--accent-surface); }
+[data-appearance='anime'] .new-task-button { background: var(--accent); color: var(--accent-dark); box-shadow: 0 4px 16px var(--card-shadow); }
+[data-appearance='anime'] .new-task-button:hover:not(:disabled) { background: var(--accent-hover); }
+[data-appearance='anime'] .button-key { color: var(--accent-dark); border-color: currentColor; }
+.anime-welcome { padding: 24px 28px; border: 1px solid var(--border); border-radius: var(--radius); background: radial-gradient(ellipse at 90% 30%, var(--welcome-halo), transparent 65%), linear-gradient(110deg, var(--panel), var(--welcome-end)); position: relative; overflow: hidden; min-height: 154px; align-items: center; }
+.anime-welcome h2 { font-size: clamp(22px, 2.2vw, 30px); line-height: 1.35; letter-spacing: -0.5px; }
+.anime-welcome .overview-meta { display: grid; grid-template-columns: auto auto; gap: 0 12px; position: relative; padding-top: 104px; }
+.welcome-portrait { position: absolute; right: 14px; top: -13px; width: 118px; height: 118px; transform: rotate(5deg); }
+.anime-portrait { display: block; width: 100%; height: 100%; }
+[data-appearance='anime'] .office-view { box-shadow: 0 8px 28px var(--card-shadow); }
+[data-appearance='anime'] .role-card { border-radius: 12px; position: relative; overflow: hidden; }
+[data-appearance='anime'] .role-card::before { content: ''; display: block; height: 2px; background: var(--role-color); opacity: 0.65; position: absolute; inset: 0 0 auto; }
+[data-appearance='anime'] .role-card.is-active { box-shadow: 0 0 0 1px var(--accent-border); }
+[data-appearance='anime'] .role-card-heading { flex-wrap: wrap; align-items: center; }
+[data-appearance='anime'] .role-card-heading > span:nth-child(2) { flex: 1 1 80px; min-width: 0; }
+[data-appearance='anime'] .role-card h3 { line-height: 1.6; overflow-wrap: anywhere; }
+[data-appearance='anime'] .role-card-heading small { font-size: 9px; line-height: 1.6; }
+[data-appearance='anime'] .role-avatar.portrait-avatar { width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0; overflow: hidden; background: var(--portrait-backdrop); border-color: var(--border); }
+[data-appearance='anime'] .role-card:nth-child(3n + 2),
+[data-appearance='anime'] .map-station:nth-child(3n + 2) { --portrait-hair: #92cbbb; --portrait-eye: #39786d; --portrait-backdrop: #283e40; }
+[data-appearance='anime'] .role-card:nth-child(3n),
+[data-appearance='anime'] .map-station:nth-child(3n) { --portrait-hair: #edb6ce; --portrait-eye: #995570; --portrait-backdrop: #462f42; }
+[data-appearance='anime'] .map-station > span { width: 76px; height: 76px; }
+[data-appearance='anime'] .office-map { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 16px; padding: 24px; }
+[data-appearance='anime'] .map-caption { grid-column: 1 / -1; }
+[data-appearance='anime'] .empty-mission-art { width: 120px; height: 120px; transform: rotate(-5deg); }
+[data-appearance='anime'] .mission-panel { box-shadow: 0 8px 24px var(--card-shadow); }
+[data-appearance='anime'] .mission-panel h2 { font-size: 22px; }
+[data-appearance='anime'] .activity-panel { background: var(--panel); }
+@media (max-width: 1250px) {
+  .topbar { flex-wrap: wrap; height: auto; min-height: 99px; padding-block: 16px; }
+  .connection-controls { margin-left: auto; }
+  .anime-welcome { padding: 20px; gap: 20px; }
+  .anime-welcome .overview-meta { display: none; }
+}
+@media (max-width: 760px) {
+  .appearance-switch { margin-left: auto; }
+  .mobile-new { margin-left: 0; }
+  .anime-welcome { min-height: 0; padding: 20px; }
+  .anime-welcome h2 { font-size: 24px; }
+  .anime-welcome p { font-size: 11px; }
+  [data-appearance='anime'] .role-card-heading { align-items: flex-start; }
+  [data-appearance='anime'] .role-card-heading > span:nth-child(2) { flex-basis: auto; }
+  [data-appearance='anime'] .role-card-heading small { min-height: 0; }
+}
+@media (max-width: 420px) {
+  .appearance-switch { margin-left: 0; }
+  .topbar .mobile-new { margin-left: auto; }
+  .anime-welcome h2 { font-size: 22px; }
+}

@@ -56,8 +56,9 @@ export async function createApp(options: { root: string; store: Store; provider?
     reply.header('Cache-Control', 'no-store');
   });
   app.addHook('onSend', async (_request, reply, payload) => {
+    // GLTFLoader decodes embedded local VRM textures through blob URLs (ImageBitmap/HTMLImage).
     reply.header('X-Content-Type-Options', 'nosniff').header('Referrer-Policy', 'no-referrer')
-      .header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'");
+      .header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' blob: ws://127.0.0.1:* ws://localhost:*; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'");
     return payload;
   });
   app.setErrorHandler((error, request, reply) => {

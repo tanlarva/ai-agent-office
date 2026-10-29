@@ -89,4 +89,12 @@ Màn hình nhân viên dựng từ sự kiện runtime đã lưu (lệnh, exit c
 Accepted ngày 22/10/2026. Vẫn procedural, không asset ngoài (giữ D-10): geometry/material dùng chung, robot có damping, chớp mắt,
 giơ tay khi hỏi, ăn mừng khi bàn giao, bảng tên và màn hình bàn hiển thị lệnh thật; camera xoay/phóng; giảm DPR khi GPU chậm.
 Ô “Giao việc nhanh” nhớ dự án/provider/quyền và gợi ý quy trình bằng từ khoá cục bộ (không gọi model).
+
+## D-14 — Model anime local cho lớp quan sát
+
+Accepted ngày 29/10/2026: người dùng yêu cầu tìm model anime trên web, rồi giao phối và đăng nhập BOOTH để tải.
+Cho phép asset bên ngoài cho nhân vật Anime, thay ràng buộc chỉ procedural của D-10/D-13 ở phần nhân vật;
+nội thất, robot Cổ điển và tính năng tương tác v0.6 được giữ. Yori + Amane là phối kỹ thuật trong phạm vi được giao.
+VRM tải chính thức, chỉ dùng trên máy, không commit/phân phối binary; thêm loader pixiv chính thức, không gọi model AI để hoạt ảnh.
+Xem [ADR-0003](decisions/ADR-0003-local-anime-cast.md). Không đổi provider, billing, quyền workspace hoặc nguồn trạng thái runtime.
 Thêm mẫu `solo` (Một agent) cho việc nhỏ — triển khai T-02.

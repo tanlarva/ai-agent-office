@@ -65,7 +65,7 @@ Xem [bàn giao v0.2](docs/handoffs/SESSION-WORKSPACE-02.md) để kiểm tra tí
 Một run chiếm worker duy nhất toàn ứng dụng. Các mẫu có 3–5 bước tuần tự, chưa là scheduler DAG đa worker.
 Xem [quy trình và vai trò v0.3](docs/WORKFLOWS.md). Phiên lưu mẫu mặc định; run lưu snapshot riêng.
 Developer và QA độc lập trong mẫu phần mềm; 2D/3D hiển thị đội theo quy trình thực tế.
-Cảnh 3D dùng hình học tạo trong code, lazy load; bảng 2D vẫn đầy đủ khi tắt 3D.
+Cảnh 3D tải riêng khi bật; nội thất và robot cổ điển dùng hình học tạo trong code. Bảng 2D vẫn đầy đủ khi tắt 3D.
 Chỉ trạng thái/số liệu có thật được hiển thị, không có dữ liệu demo trong luồng live.
 
 ## Điều tiết Codex và chạy tiếp (v0.4)
@@ -131,6 +131,19 @@ tự giảm độ phân giải khi GPU chậm, tôn trọng chế độ giảm c
 
 Xem [ADR-0002](docs/decisions/ADR-0002-claude-provider-and-interaction.md) và [bàn giao v0.6](docs/handoffs/CLAUDE-INTERACT-07.md).
 
+## Giao diện Anime
+
+Giao diện mặc định dùng sắc sakura ban đêm và avatar chibi. Cảnh Anime hỗ trợ phối Yori làm Orchestrator,
+Amane Type01–04 làm thành viên theo quy trình. Tệp VRM cần tải từ tác giả bằng tài khoản BOOTH,
+đặt riêng trên máy theo [hướng dẫn model local](src/web/public/models/README.md), rồi build lại.
+Khi chưa có file hoặc model lỗi, cảnh ghi rõ tên chưa nạp được và dùng robot tai mèo thay thế.
+Chọn **Anime / Cổ điển** ở thanh trên để đổi phong cách; trình duyệt nhớ lựa chọn trên máy.
+Avatar 2D là vector tự tạo trong source. VRM 3D chỉ nạp từ file local, không tải ảnh/font ngoài lúc chạy và không gọi model AI để trang trí.
+Theme áp dụng cho bảng 2D, thẻ vai trò, hộp giao việc và tham quan; tên vai trò/trạng thái vẫn theo workflow/runtime.
+Xem [bàn giao giao diện](docs/handoffs/ANIME-07-integrator.md) để biết file và kiểm chứng.
+Nguồn nhân vật có trong mục **Nhân vật & tác giả** dưới cảnh. File model được Git bỏ qua;
+không chia sẻ thư mục `dist/web/models/local` hoặc đưa model lên public khi chưa có quyền phân phối phù hợp.
+
 ## Kiểm soát phạm vi
 
 Backend bind loopback, kiểm tra Host/Origin, cookie HttpOnly + SameSite và CSRF cho mutation.
@@ -192,4 +205,5 @@ Các task ghi thao tác tuần tự trực tiếp trên workspace bạn chọn, 
 MVP chưa triển khai artifact download riêng, pause/resume provider hoặc tuỳ biến task graph.
 Ba đến năm lượt model cho một việc nhỏ có thể tốn hơn một agent; chưa có benchmark chứng minh giảm token.
 Danh sách gần đây giới hạn 30 run trên UI; API lịch sử có cursor.
-Scene Three.js có chunk lớn khoảng 925 KB minified, được tải riêng khi bật 3D.
+Scene Three.js/VRM có chunk lớn khoảng 1,1 MB minified, được tải riêng khi bật 3D.
+Đội hình Yori + Amane hiện dùng khoảng 86,4 MiB file model local; chưa benchmark GPU trên máy yếu.

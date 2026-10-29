@@ -14,3 +14,4 @@ auth.json
 coverage/
 test-results/
 playwright-report/
+src/web/public/models/local/

@@ -226,6 +226,10 @@ test('HTTP authentication, origin, validation and safe errors', async t => {
   assert.equal((await app.inject({ url: '/api/session', headers: { ...headers, host: 'evil.example' } })).statusCode, 403);
   assert.equal((await app.inject({ url: '/api/providers', headers })).statusCode, 401);
   const session = await app.inject({ url: '/api/session', headers });
+  const csp = session.headers['content-security-policy'];
+  assert.ok(csp.includes("img-src 'self' data: blob:"));
+  assert.ok(csp.includes("connect-src 'self' blob: ws://127.0.0.1:* ws://localhost:*"));
+  assert.ok(csp.includes("script-src 'self';"));
   const auth = { ...headers, cookie: session.headers['set-cookie'].split(';')[0] };
   const token = session.json().data.csrfToken;
   assert.equal((await app.inject({ url: '/api/providers', headers: auth })).statusCode, 200);

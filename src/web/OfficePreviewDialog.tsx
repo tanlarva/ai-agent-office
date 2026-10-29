@@ -5,9 +5,10 @@ import { officeThemes } from '../shared/office-scene';
 import { getWorkflow, workflows, type WorkflowId } from '../shared/workflows';
 import { stateLabels } from './labels';
 import { SceneBoundary } from './SceneBoundary';
+import { AnimeCastCredits } from './AnimeCastCredits';
 
 const OfficeScene = lazy(() => import('./OfficeScene'));
-export function OfficePreviewDialog({ initialTheme, reducedMotion, onClose }: { initialTheme: WorkflowId; reducedMotion: boolean; onClose: () => void }) {
+export function OfficePreviewDialog({ initialTheme, reducedMotion, anime = false, onClose }: { initialTheme: WorkflowId; reducedMotion: boolean; anime?: boolean; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [themeId, setThemeId] = useState(initialTheme), [progress, setProgress] = useState(0), [epoch, setEpoch] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -26,8 +27,8 @@ export function OfficePreviewDialog({ initialTheme, reducedMotion, onClose }: { 
     <p className="preview-intro">Đây là minh hoạ cục bộ. Không tạo công việc, không đọc dự án và không dùng token.</p>
     <label htmlFor="preview-workflow">Chọn văn phòng</label>
     <select id="preview-workflow" value={themeId} onChange={event => { setThemeId(event.target.value as WorkflowId); reset(); }}>{workflows.map(item => <option key={item.id} value={item.id}>{officeThemes[item.id].name} · {item.steps.length} vai trò</option>)}</select>
-    <div className="preview-room"><div className="preview-room-heading"><strong>{theme.name}</strong><span>DEMO</span></div><div className="preview-canvas" aria-hidden="true"><SceneBoundary key={themeId}><Suspense fallback={<div className="scene-fallback"><LoaderCircle size={24} className="spinner" />Đang mở phòng…</div>}><OfficeScene run={preview} reducedMotion={reducedMotion || paused} /></Suspense></SceneBoundary></div></div>
-    <p className="preview-caption">{theme.description}. Bấm bàn giao để thấy nhân vật đi qua lối trống, chuyển hồ sơ rồi trở về.</p>
+    <div className="preview-room"><div className="preview-room-heading"><strong>{theme.name}</strong><span>DEMO</span></div><div className="preview-canvas"><SceneBoundary key={themeId}><Suspense fallback={<div className="scene-fallback"><LoaderCircle size={24} className="spinner" />Đang mở phòng…</div>}><OfficeScene run={preview} anime={anime} reducedMotion={reducedMotion || paused} /></Suspense></SceneBoundary></div></div>
+    {anime && <AnimeCastCredits />}<p className="preview-caption">{theme.description}. Bấm bàn giao để thấy nhân vật đi qua lối trống, chuyển hồ sơ rồi trở về.</p>
     <div className="preview-actions"><button className="button primary" onClick={() => setProgress(value => Math.min(value + 1, workflow.steps.length))} disabled={progress >= workflow.steps.length}>Bàn giao bước tiếp<ArrowUpRight size={15} /></button><button className="button secondary" onClick={reset}><RotateCcw size={14} />Làm lại</button><button className="text-button" disabled={reducedMotion} onClick={() => setPaused(value => !value)}>{reducedMotion ? 'Theo chế độ giảm chuyển động' : paused ? 'Bật chuyển động' : 'Dừng chuyển động'}</button></div>
     <ol className="preview-roster" aria-label="Các bước minh hoạ">{preview.tasks.map((task, index) => <li key={task.id}><span>{String(index + 1).padStart(2, '0')}</span><strong>{workflow.steps[index]!.name}</strong><small>{stateLabels[task.state]}</small></li>)}</ol>
   </dialog>;

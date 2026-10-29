@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import type { OrthographicCamera } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -8,6 +8,10 @@ import { buildFeed } from './debugFeed';
 import { rolesForRun, stateLabels } from './labels';
 import { OfficeRoom, Workstation } from './OfficeFurniture';
 import { OfficeAgent } from './OfficeAgent';
+import { castForRole } from './anime-cast';
+import type { ModelStatus } from './AnimeModel';
+
+const animeLighting = { background: '#1c1b30', sky: '#e7ddff', key: '#ffe2ef' };
 
 const target = [0, 0.5, 0.5] as const;
 function fitZoom(width: number, height: number) { return Math.min(width / 20.5, height / 15.5); }
@@ -76,20 +80,25 @@ function screenLines(events: readonly OfficeEvent[], task: Task | undefined): st
     : entry.kind === 'status' ? [(entry.tone === 'user' ? '? ' : '· ') + entry.text] : []).slice(-7);
 }
 
-export default function OfficeScene({ run, events = [], reducedMotion, focusTaskId = null, onSelectTask }: {
-  run: Run | null; events?: readonly OfficeEvent[]; reducedMotion: boolean; focusTaskId?: string | null; onSelectTask?: (taskId: string) => void;
+export default function OfficeScene({ run, events = [], reducedMotion, anime = false, focusTaskId = null, onSelectTask }: {
+  run: Run | null; events?: readonly OfficeEvent[]; reducedMotion: boolean; anime?: boolean; focusTaskId?: string | null; onSelectTask?: (taskId: string) => void;
 }) {
   const roles = rolesForRun(run), theme = officeThemeForRun(run);
   const steps = run?.workflow?.steps;
+  const [statuses, setStatuses] = useState<Record<string, ModelStatus>>({});
+  const onModelStatus = useCallback((id: string, status: ModelStatus) => setStatuses(previous => previous[id] === status ? previous : { ...previous, [id]: status }), []);
+  const members = roles.map((role, index) => castForRole(role.id, index));
+  const unavailable = members.filter(member => statuses[member.id] === 'missing' || statuses[member.id] === 'error');
+  const loaded = members.filter(member => statuses[member.id] === 'ready').length;
   const lines = useMemo(() => run?.tasks.map(task => screenLines(events, task)) ?? [], [events, run?.tasks]);
-  return <Canvas shadows dpr={[1, 1.75]} frameloop="demand" orthographic gl={{ antialias: true, powerPreference: 'high-performance' }} camera={{ position: [12, 14, 16], zoom: 35, near: 0.1, far: 100 }} fallback={<div className="scene-fallback">Trình duyệt không hỗ trợ 3D. Theo dõi agent trong bảng phía dưới.</div>}>
+  return <div className="office-scene-host"><Canvas aria-hidden="true" shadows dpr={[1, anime ? 1.5 : 1.75]} frameloop="demand" orthographic gl={{ antialias: true, powerPreference: 'high-performance' }} camera={{ position: [12, 14, 16], zoom: 35, near: 0.1, far: 100 }} fallback={<div className="scene-fallback">Trình duyệt không hỗ trợ 3D. Theo dõi agent trong bảng phía dưới.</div>}>
     <CameraRig interactive={!!onSelectTask} />
     <AmbientTicker enabled={!reducedMotion} />
     <AdaptiveResolution />
-    <color attach="background" args={[theme.background]} />
-    <fog attach="fog" args={[theme.background, 26, 48]} />
-    <ambientLight intensity={0.85} /><hemisphereLight args={['#e0e7ec', theme.floor, 1.45]} />
-    <directionalLight position={[3, 11, 6]} intensity={2.6} color="#ffe6cc" castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} shadow-normalBias={0.04} />
+    <color attach="background" args={[anime ? animeLighting.background : theme.background]} />
+    <fog attach="fog" args={[anime ? animeLighting.background : theme.background, 26, 48]} />
+    <ambientLight intensity={0.85} /><hemisphereLight args={[anime ? animeLighting.sky : '#e0e7ec', theme.floor, 1.45]} />
+    <directionalLight position={[3, 11, 6]} intensity={2.6} color={anime ? animeLighting.key : '#ffe6cc'} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} shadow-normalBias={0.04} />
     <directionalLight position={[-8, 6, 10]} intensity={0.55} color={theme.accent} />
     <group key={(run?.id ?? 'empty') + ':' + theme.id}>
       <OfficeRoom theme={theme} motion={!reducedMotion} />
@@ -100,9 +109,11 @@ export default function OfficeScene({ run, events = [], reducedMotion, focusTask
           <Workstation x={station[0]} z={station[1]} color={role.color} theme={theme} active={task?.state === 'running'} screenLines={lines[index] ?? []} motion={!reducedMotion} />
           <OfficeAgent station={station} index={index} color={role.color} state={task?.state} kind={steps?.[index]?.kind} provider={task?.provider ?? run?.provider ?? 'codex'}
             name={role.name} status={status} thinking={task?.activity === 'Đang soạn phản hồi…'} selected={!!task && task.id === focusTaskId}
-            motionDisabled={reducedMotion} theme={theme} onSelect={task && onSelectTask ? () => onSelectTask(task.id) : undefined} />
+            motionDisabled={reducedMotion} theme={theme} anime={anime} member={anime ? castForRole(role.id, index) : undefined} onModelStatus={onModelStatus} onSelect={task && onSelectTask ? () => onSelectTask(task.id) : undefined} />
         </group>;
       })}
     </group>
-  </Canvas>;
+  </Canvas>{anime && <div className={`model-load-note ${unavailable.length ? 'has-fallback' : ''}`} role="status">
+    {unavailable.length ? `Chưa nạp được ${unavailable.map(member => member.name).join(', ')}. Đang dùng robot thay thế.` : loaded === members.length ? 'Đội hình: Yori + Amane' : `Đang mở nhân vật anime (${loaded}/${members.length})…`}
+  </div>}</div>;
 }
