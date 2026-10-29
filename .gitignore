@@ -15,3 +15,5 @@ coverage/
 test-results/
 playwright-report/
 src/web/public/models/local/
+release/
+/AI Agent Office.exe

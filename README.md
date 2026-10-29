@@ -34,6 +34,14 @@ Mở **http://127.0.0.1:4310**. Ctrl+C để dừng.
 Phát triển: `npm run dev`, mở http://127.0.0.1:5173.
 Dev gồm TypeScript watch, backend và Vite; schema/backend được compile trước khi start.
 
+### Mở bằng exe / bản portable
+
+Chạy `npm run build` rồi `npm run build:launcher` một lần để tạo **AI Agent Office.exe** ngay tại root.
+Nhấp đúp exe để chạy ẩn và mở browser; chuột phải biểu tượng khay → **Thoát và dừng công việc** để dừng.
+Chạy `npm run build:portable` để tạo thư mục portable trong `release/`, kèm Node.js và dependency production.
+Provider CLI/đăng nhập vẫn dùng trên máy; bản mặc định không kèm lịch sử, credential hoặc model nhân vật local.
+Xem [hướng dẫn launcher và portable](docs/PORTABLE.md) cho cách dùng, backup, bản riêng có VRM và kiểm tra lỗi.
+
 ## Cách dùng
 
 1. Bấm Giao việc, chọn phiên dự án đã có hoặc tạo phiên mới, đặt tên và chọn workspace bằng cây thư mục.

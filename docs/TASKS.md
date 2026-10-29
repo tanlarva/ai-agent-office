@@ -1,5 +1,17 @@
 # Bảng công việc
 
+## LAUNCHER-10 — done
+
+Yêu cầu ngày 29/10/2026: thêm launcher Windows, nhấp exe để dùng app.
+Owner: Integrator, checkout hiện tại; giữ nguyên các thay đổi Anime/v0.6 đang có.
+Phạm vi: launcher C#, đóng gói portable kèm Node, lifecycle backend qua stdin, test và hướng dẫn.
+Acceptance: chạy ẩn/mở browser khi sẵn sàng, nhấp lại không nhân backend, thoát dừng sạch;
+đóng gói không mang credential/database/model local trừ opt-in riêng; không gọi AI để khởi động.
+Đã tạo exe tại root và bản portable trong release, kèm Node 24; check/lint/build pass, 116/116 test pass.
+Kiểm thử exe thật bằng database riêng đạt: Unicode/space path, Node bundled, HTTP/session, duplicate,
+stop/restart, port conflict, parent crash và thiếu file. Sửa metadata @pinojs/redact trong lockfile cho khớp
+tarball 0.4.0 đã khóa; không đổi dependency tree hoặc thêm thư viện. Xem [bàn giao](handoffs/LAUNCHER-10-integrator.md).
+
 Single writer: Orchestrator / Integrator. Baseline được người dùng chốt ngày 20/10/2026.
 Frontend worker và reviewer đã bàn giao; không có worker đang giữ quyền sửa file.
 

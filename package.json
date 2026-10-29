@@ -14,6 +14,9 @@
     "lint": "eslint .",
     "test": "npm run build:server && node --test tests/*.test.mjs src/web/events.test.mjs",
     "start": "node dist/server/index.js",
+    "build:launcher": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/build-launcher.ps1",
+    "build:portable": "npm run build && node scripts/build-portable.mjs",
+    "test:launcher": "node scripts/test-launcher.mjs",
     "doctor": "npm run build:server && node dist/server/doctor.js"
   },
   "dependencies": {
